@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?><smrtpipeSettings>
+  <protocol id="RS_Resequencing_Transcript_ChickManv2.1" version="1.3.0" editable="false">
+    <param name="name" label="Protocol Name" >
+      <value>RS_Resequencing_Transcript_ChickManv2</value>
+      <input type="text" />
+      <rule required="true" />
+    </param>
+    <param name="description" >
+      <value>A general-purpose analysis workflow for whole-genome or targeted resequencing. Reads are passed through a filtering stage, mapped to a provided reference sequence, and consensus and variants are identified versus this reference.</value>
+      <textarea />
+    </param>
+    <param name="version" hidden="true">
+      <value>1</value>
+      <input type="text" />
+      <rule required="true" type="digits" min="1" />
+    </param>
+    <param name="state" >
+      <value>active</value>
+      <input type="radio" value="active" />
+      <input type="radio" value="inactive" />
+    </param>
+    <param name="reference" editableInJob="true">
+      <value>common/references/Chick_manchester_full2260</value>
+      <select>
+        <import contentType="text/xml" element="reference" name="name" value="directory" filter="state='active' type='sample'" isPath="true">common/references/index.xml</import>
+      </select>
+	</param>
+    <param name="fetch" hidden="true">
+      <value>common/protocols/preprocessing/Fetch.1.xml</value>
+    </param>
+    <param name="filtering">
+      <value>common/protocols/filtering/SFilter.1.xml</value>
+      <select multiple="true">
+        <import contentType="text/directory" extension="xml">common/protocols/filtering</import>
+      </select>
+    </param>
+  </protocol>
+  <moduleStage name="fetch" editable="false" />
+  <moduleStage name="filtering" editable="false" />
+  <moduleStage name="mapping" editable="false" >
+    <module id="P_Mapping" label="BLASR v1" editableInJob="true"  >
+      <description>BLASR maps reads to genomes by finding the highest scoring local alignment or set of local alignments between the read and the genome. The first set of  alignments is found by querying an index of the reference genome, and then refining until only high scoring alignments are retained. The base assignment in alignments is optimized and scored using all available quality information, such as insertion and deletion quality values.</description>
+      <param name="maxHits" label="Maximum number of hits per read">
+        <title>The maximum number of matches of each read to the reference sequence that will be evaluated.</title>
+        <value>1</value>
+        <input type="text" />
+        <rule type="digits" message="Value must be an integer between 0 and 1000" />
+      </param>
+      <param name="maxDivergence" label="Maximum divergence (%)">
+        <title>The maximum allowed divergence of a read from the reference sequence.</title>
+        <value>30</value>
+        <input type="text" />
+        <rule type="digits" message="Value must be an integer between 0 and 100" />
+      </param>
+      <param name="minAnchorSize" label="Minimum anchor size">
+        <title>The minimum anchor size defines the length of the read that must match against the reference sequence.</title>
+        <value>12</value>
+        <input type="text" />
+        <rule type="digits" message="Value must be an integer between 8 and 30" />
+      </param>
+      <param name="samBam" label="Write output as a BAM file">
+        <value>True</value>
+        <input type="checkbox" />
+      </param>
+      <param name="align_opts" hidden="true">
+         <value>--minAccuracy=0.75 --minLength=50</value>
+      </param>
+    </module>
+  </moduleStage>
+</smrtpipeSettings>
