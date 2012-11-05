@@ -18,6 +18,34 @@ from scipy.stats import mode, mstats
 
 from collections import defaultdict
 
+def getMaxCoveredRefMatch(alns, refLengthDict):
+    """
+    alns is a slice of /AlnInfo
+    (could be all alignments within a subread or ZMW)
+    
+    Return just the one that covers the max proportion of the ref (not the read)  
+    """
+    return max(alns, key=lambda x: (x['tEnd']-x['tStart'])*1./refLengthDict[x['RefGroupID']])
+
+def group_by_inserts(alns, inss):
+    """
+    alns is a slice of /AlnInfo
+    inss is the corressponding slice from getInsertsFromBasH5
+    
+    return a list of ins_index --> list of aln_index within this insert
+    """
+    grouped = [[] for i in xrange(len(inss))]
+    for aln_index, aln in enumerate(alns):
+        found = False
+        for ins_index, ins in enumerate(inss):
+            if ins['rStart'] <= aln['rStart'] <= aln['rEnd'] <= ins['rEnd']:
+                grouped[ins_index].append(aln_index)
+                found = True
+                break
+        if not found:
+            raise Exception, "alignment not found within inserts!!! Not OK!!!"
+    return grouped
+
 def getPolyAT(filename):
     """
     Read polyAT report file (from seqclean)
@@ -43,7 +71,6 @@ def hasPolyAT(d, movie, hn, start, end):
         if s <= start < end <= e:
             return True
     return False    
-    
 
 def getInsertsFromBasH5(bash5FN, func_is_polyAT):
     bash5 = BasH5(bash5FN)
@@ -70,7 +97,7 @@ def getInsertsFromBasH5(bash5FN, func_is_polyAT):
             hqinserts = filter(lambda ins: hqStart<=ins[0]<hqEnd or hqStart<=ins[1]<hqEnd, inserts)
             if len(hqinserts) == 0:
                 continue
-            max_insert_length = max(i[1]-i[0] for i in hqinserts)
+            #max_insert_length = max(i[1]-i[0] for i in hqinserts)
             #max_insert_length = 0
 
             for i in hqinserts:
@@ -93,7 +120,8 @@ def getInsertsFromBasH5(bash5FN, func_is_polyAT):
                 isFullPass = iStart in adapterEnds and iEnd in adapterStarts
                 
                 # technically this is not always right if HQtrim happens, but oh well should be OK
-                isLongest = (iEnd-iStart) == max_insert_length
+                #isLongest = (iEnd-iStart) == max_insert_length
+                isLongest = False # for now set everything to false, re-set at the end
                 
                 isHQTrimmed = False
                 # trim by HQRegion
@@ -111,8 +139,16 @@ def getInsertsFromBasH5(bash5FN, func_is_polyAT):
                 #print "Adding", insert
                 data.append(insert)
 
-    return n.array(data, dtype=[('HoleNumber', '<i4'), ('rStart', '<i4'), ('rEnd', '<i4'), ('IsFullPass', n.bool), ('IsHQTrimmed', n.bool), ('IsLongest', n.bool), ('IsAT', n.bool)])
-
+    data = n.array(data, dtype=[('HoleNumber', '<i4'), ('rStart', '<i4'), ('rEnd', '<i4'), ('IsFullPass', n.bool), ('IsHQTrimmed', n.bool), ('IsLongest', n.bool), ('IsAT', n.bool)])
+    # for each ZMW, set the IsLongest label                
+    for hn in n.unique(data['HoleNumber']):
+        x = data[data['HoleNumber']==hn]
+        max_len = max(x['rEnd'] - x['rStart'])
+        p = data[(data['HoleNumber']==hn)&(data['rEnd']-data['rStart']==max_len)]
+        p['IsLongest'] = True
+        data[(data['HoleNumber']==hn)&(data['rEnd']-data['rStart']==max_len)] = p
+    return data
+        
 def getInsertsFromFofn(inputFOFN, primer_match_filename):
     import functools
     
@@ -129,6 +165,7 @@ def getInsertsFromFofn(inputFOFN, primer_match_filename):
 
 def getReferenceLengths(cmph5):
     return cmph5['/RefInfo'].asRecArray()['Length']
+
 
 def getAlignedLengthRatios(cmph5, inserts):
     aIdx = cmph5['/AlnInfo'].asRecArray()
@@ -150,26 +187,51 @@ def getAlignedLengthRatios(cmph5, inserts):
                 # get inserts and alignments
                 inss = ins[ins['HoleNumber'] == hn]
                 alns = sl[sl['HoleNumber'] == hn]
-
-                for a in alns:
+                
+                if len(inss) == 0:
+                    continue
+                
+                for ins_index, aln_indices in enumerate(group_by_inserts(alns, inss)):
+                    if len(aln_indices) == 0:
+                        continue
+                    i = inss[ins_index]
+                    a = getMaxCoveredRefMatch(alns[aln_indices], refLengthDict)
+                   # pdb.set_trace()
                     rStart = a['rStart']
                     rEnd = a['rEnd']
                     tStart = a['tStart']
                     tEnd = a['tEnd']
                     refGroupID = a['RefGroupID']
                     refLength = refLengthDict[refIdDict[refGroupID]]
+                    iStart = i['rStart']
+                    iEnd = i['rEnd']
+                    iIsFullPass = i['IsFullPass']
+                    iIsHQTrimmed = i['IsHQTrimmed']
+                    iIsLongest = i['IsLongest']
+                    iIsAT = i['IsAT']
 
-                    for i in inss:
-                        iStart = i['rStart']
-                        iEnd = i['rEnd']
-                        iIsFullPass = i['IsFullPass']
-                        iIsHQTrimmed = i['IsHQTrimmed']
-                        iIsLongest = i['IsLongest']
-                        iIsAT = i['IsAT']
+                    results.append((movieID, refIdDict[refGroupID], hn, rStart, rEnd, tStart, tEnd, iStart, iEnd, refLength, iIsFullPass, iIsHQTrimmed, iIsLongest, iIsAT))
+                
 
-                        if rStart >= iStart and rEnd <= iEnd:
-                            results.append((movieID, refIdDict[refGroupID], hn, rStart, rEnd, tStart, tEnd, iStart, iEnd, refLength, iIsFullPass, iIsHQTrimmed, iIsLongest, iIsAT))
-
+#                for a in alns:
+#                    rStart = a['rStart']
+#                    rEnd = a['rEnd']
+#                    tStart = a['tStart']
+#                    tEnd = a['tEnd']
+#                    refGroupID = a['RefGroupID']
+#                    refLength = refLengthDict[refIdDict[refGroupID]]
+#
+#                    for i in inss:
+#                        iStart = i['rStart']
+#                        iEnd = i['rEnd']
+#                        iIsFullPass = i['IsFullPass']
+#                        iIsHQTrimmed = i['IsHQTrimmed']
+#                        iIsLongest = i['IsLongest']
+#                        iIsAT = i['IsAT']
+#
+#                        if rStart >= iStart and rEnd <= iEnd:
+#                            results.append((movieID, refIdDict[refGroupID], hn, rStart, rEnd, tStart, tEnd, iStart, iEnd, refLength, iIsFullPass, iIsHQTrimmed, iIsLongest, iIsAT))
+#
     return n.array(results, dtype=[('MovieID', '<i2'), ('RefID', '<i4'), ('HoleNumber', '<i4'),
                                    ('rStart', '<i4'), ('rEnd', '<i4'),
                                    ('tStart', '<i4'), ('tEnd', '<i4'),
