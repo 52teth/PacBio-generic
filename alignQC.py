@@ -250,7 +250,7 @@ def makeFractionSubreadHistogram(alnRatios, outfile, format):
     Longest = alnRatios[alnRatios['IsLongest']]
     AT = alnRatios[alnRatios['IsAT']]
 
-    for l, label in zip((alnRatios, HQRegion, fullPass, Longest, AT), ("All Subreads", "HQRegion Subreads", "HQRegion Full-Pass Subreads", "HQRegion Longest Subreads", "HQRegion 5'-polyA-3'")):
+    for l, label in zip((alnRatios, HQRegion, fullPass, Longest, AT), ("All Subreads", "HQRegion Subreads", "HQRegion Full-Pass Subreads", "HQRegion Longest Subreads", "HQRegion " + SeenName)):
         alnLength = l['rEnd'] - l['rStart']
         srLength = l['iEnd'] - l['iStart']
         alnSubRatio = alnLength.astype(float) / srLength.astype(float)
@@ -271,7 +271,7 @@ def makeSubreadRLHistogram(alnRatios, outfile, format, quantile=None):
     Longest = alnRatios[alnRatios['IsLongest']]
     AT = alnRatios[alnRatios['IsAT']]
     
-    for l, label in zip((alnRatios, HQRegion, fullPass, Longest, AT), ("All Subreads", "HQRegion Subreads", "HQRegion Full-Pass Subreads", "HQRegion Longest Subreads", "HQRegion 5'-polyA-3'")):
+    for l, label in zip((alnRatios, HQRegion, fullPass, Longest, AT), ("All Subreads", "HQRegion Subreads", "HQRegion Full-Pass Subreads", "HQRegion Longest Subreads", "HQRegion " + SeenName)):
         srLength = l['iEnd'] - l['iStart']
 
         if not quantile == None:
@@ -294,7 +294,7 @@ def makeFractionReferenceHistogram(alnRatios, outfile, format):
     Longest = alnRatios[alnRatios['IsLongest']]
     AT = alnRatios[alnRatios['IsAT']]
     
-    for l, label in zip((alnRatios, HQRegion, fullPass, Longest, AT), ("All Subreads", "HQRegion Subreads", "HQRegion Full-Pass Subreads", "HQRegion Longest Subreads", "HQRegion 5'-polyA-3'")):    
+    for l, label in zip((alnRatios, HQRegion, fullPass, Longest, AT), ("All Subreads", "HQRegion Subreads", "HQRegion Full-Pass Subreads", "HQRegion Longest Subreads", "HQRegion " + SeenName)):    
         alnLength = l['tEnd'] - l['tStart']
         refLength = l['RefLength']
         alnSubRatio = alnLength.astype(float) / refLength.astype(float)
@@ -538,7 +538,7 @@ def write_summary_page(pdf_filename, args, inserts, alnRatios):
     data.append(["Total", total, len(alnRatios), len(set(alnRatios[:]['RefID']))])
     data.append(["FullPass", fullpass, len(alnRatios[alnRatios['IsFullPass']]), len(set(alnRatios[alnRatios['IsFullPass']]['RefID']))])
     data.append(["Longest", longest, len(alnRatios[alnRatios['IsLongest']]), len(set(alnRatios[alnRatios['IsLongest']]['RefID']))])
-    data.append(["5'-polyA-3'", AT, len(alnRatios[alnRatios['IsAT']]), len(set(alnRatios[alnRatios['IsAT']]['RefID']))])
+    data.append([SeenName, AT, len(alnRatios[alnRatios['IsAT']]), len(set(alnRatios[alnRatios['IsAT']]['RefID']))])
              
     t=Table(data)
     t.setStyle(TableStyle([('BACKGROUND', (0,0), (0,-1), colors.gray),
@@ -548,9 +548,22 @@ def write_summary_page(pdf_filename, args, inserts, alnRatios):
     elements.append(t)
     # write the document to disk
     doc.build(elements)
+    
+def make_MovieDict(cmpH5):
+    """
+    Return a dict of MovieID --> MovieName
+    """
+    return cmpH5['/MovieInfo'].asDict('ID', 'Name')
 
+def make_RefDict(cmpH5):
+    """
+    Return a dict of RefID --> RefName
+    """
+    return cmpH5['/MovieInfo'].asDict('ID', 'FullName')
 
 if __name__ == "__main__":
+    global SeenName
+    SeenName = "5'-3'"
     parser = argparse.ArgumentParser(description='Create some plots for transcript analyses.')
     parser.add_argument('job_directory')
     parser.add_argument('-d', '--output_directory')
@@ -569,14 +582,18 @@ if __name__ == "__main__":
     refLengths = getReferenceLengths(cmpH5)
    
     if args.read_pickle:
-        inserts, alnRatios = pickle.load(open(args.read_pickle, 'rb'))
-
+        stuff = pickle.load(open(args.read_pickle, 'rb'))
+        if type(stuff) is dict:
+            inserts = stuff['inserts']
+            alnRatios = stuff['alns']
+        else:
+            inserts, alnRatios = stuff
     else:
         print "Reading inserts from input.fofn"
         inserts = getInsertsFromFofn(inFOFN, args.primer_match_file)
         print "Gathering alignment lengths"
         alnRatios = getAlignedLengthRatios(cmpH5, inserts)
-        pickle.dump((inserts,alnRatios), open(os.path.join(args.output_directory, args.output_prefix + ".pkl"), 'wb'))
+        pickle.dump({'inserts':inserts,'alns':alnRatios,'MovieDict':make_MovieDict(cmpH5),'RefDict':make_RefDict(cmpH5)}, open(os.path.join(args.output_directory, args.output_prefix + ".pkl"), 'wb'))
 
     write_summary_page(os.path.join(args.output_directory, args.output_prefix + '.summary.pdf'), args, inserts, alnRatios)
     #sys.exit(-1)
@@ -590,19 +607,19 @@ if __name__ == "__main__":
         makeReferenceRLHistogram(alnRatios, refLengths, pp, "pdf", 0.99)
         makeAlignmentPercentileDistribution(alnRatios, pp, "pdf")
         makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", "IsLongest", "Longest")
-        makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", "IsAT", "5'-polyA-3'")
-        makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", "IsAT", "5'-polyA-3'", (1000,2000))
+        makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", "IsAT", SeenName)
+        #makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", "IsAT", SeenName, (1000,2000))
         makeFractionReferenceHistogram(alnRatios, pp, "pdf")
         makeSubreadLengthVsReferenceLengthHexbinHist(alnRatios, pp, "pdf")
         makeSubreadLengthVsReferenceLengthHexbinHist(alnRatios, pp, "pdf", "IsLongest", "Longest")
-        makeSubreadLengthVsReferenceLengthHexbinHist(alnRatios, pp, "pdf", "IsAT", "5'-polyA-3'")
-        makeSubreadLengthVsReferenceLengthHexbinHist_LongestSubreadOnly(alnRatios, pp, "pdf", "IsAT", "5'-polyA-3'")
+        makeSubreadLengthVsReferenceLengthHexbinHist(alnRatios, pp, "pdf", "IsAT", SeenName)
+        makeSubreadLengthVsReferenceLengthHexbinHist_LongestSubreadOnly(alnRatios, pp, "pdf", "IsAT", SeenName)
         makeFractionReferencevsFractionSubreadHexbinHist(alnRatios, pp, "pdf")
         makeFractionReferencevsFractionSubreadHexbinHist(alnRatios, pp, "pdf", "IsLongest", "Longest")
-        makeFractionReferencevsFractionSubreadHexbinHist(alnRatios, pp, "pdf", "IsAT", "5'-polyA-3'")
+        makeFractionReferencevsFractionSubreadHexbinHist(alnRatios, pp, "pdf", "IsAT", SeenName)
         makeFractionReferencevsReferenceLengthHexbinHist(alnRatios, pp, "pdf")
         makeFractionReferencevsReferenceLengthHexbinHist(alnRatios, pp, "pdf", "IsLongest", "Longest")
-        makeFractionReferencevsReferenceLengthHexbinHist(alnRatios, pp, "pdf", "IsAT", "5'-polyA-3'")
+        makeFractionReferencevsReferenceLengthHexbinHist(alnRatios, pp, "pdf", "IsAT", SeenName)
     
         pp.close()
     elif args.output_type == "png":
