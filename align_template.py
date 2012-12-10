@@ -9,9 +9,14 @@ def main(input_dir, ref, **kwargs):
     """
     """
     bestn = 1
+    ncand = 10
     for key in kwargs:
         if key == 'bestn':
             bestn = kwargs[key]
+        elif key == 'nCandidates':
+            ncand = kwargs[key]
+        else:
+            print >> sys.stderr, "Unknown misc parameter: {0}!!!".format(key)
         
     
     input_dir = os.path.abspath(input_dir)
@@ -28,8 +33,11 @@ def main(input_dir, ref, **kwargs):
         input = os.path.join(input_dir, "input.chunk{0:03d}of{1:03d}.fofn".format(i, total))
         with open(input, 'w') as f: f.write(file + '\n')        
         rgn = os.path.join(input_dir, "data", "filtered_regions", os.path.basename(file).replace('.bas.h5','.rgn.h5'))
-        filtered = os.path.join(input_dir, "filtered_regions.chunk{0:03d}of{1:03d}.fofn".format(i, total))
-        with open(filtered, 'w') as f: f.write(rgn + '\n')
+        cmd_rgn = ''
+        if os.path.exists(rgn):
+                filtered = os.path.join(input_dir, "filtered_regions.chunk{0:03d}of{1:03d}.fofn".format(i, total))
+                with open(filtered, 'w') as f: f.write(rgn + '\n')
+                cmd_rgn = '--regionTable ' + filtered
         output = os.path.join(input_dir, "aligned_reads.chunk{0:03d}of{1:03d}.cmp.h5".format(i, total))
  
         with open(os.path.join(input_dir,"align_{0:03d}of{1:03d}.sh".format(i, total)), 'w') as f:
@@ -37,13 +45,13 @@ def main(input_dir, ref, **kwargs):
 """
 echo 'Started on' `date -u`;
 
-compareSequences.py --info --useGuidedAlign --algorithm=blasr --multiple=all --nproc=15  --noXML --h5mode=w --h5fn={output} --minAccuracy=0.75 --minLength=50  -x -minMatch 12 -x -bestn {bestn} -x -minPctIdentity 70.0 -x -sa {ref}/sequence/{refbase}.fasta.sa --tmpDir=/scratch --regionTable={filtered} "{input}" "{ref}" || exit $?;
+compareSequences.py --info --useGuidedAlign --algorithm=blasr --multiple=all --nproc=15  --noXML --h5mode=w --h5fn={output} --minAccuracy=0.75 --minLength=50  -x -minMatch 12 -x -bestn {bestn} -x -nCandidates {ncand} -x -minPctIdentity 70.0 -x -sa {ref}/sequence/{refbase}.fasta.sa --tmpDir=/scratch {cmd_rgn} "{input}" "{ref}" || exit $?;
 echo 'Alignment Complete' || exit $?;
 date || exit $?;
-loadPulses {input} {output} -metrics QualityValue,InsertionQV,DeletionQV,IPD,PulseWidth -byread || exit $?;
+loadPulses {input} {output} -metrics DeletionQV,IPD,InsertionQV,PulseWidth,QualityValue,MergeQV,SubstitutionQV,DeletionTag -byread || exit $?;
 echo 'LoadPulses Complete' || exit $?;
 date || exit $?;
-cmpH5Sort.py {output} || exit $?;
+cmph5tools.py sort {output} || exit $?;
 echo 'Sorting Complete' || exit $?;
 date || exit $?;
 
@@ -51,7 +59,7 @@ echo 'Finished on' `date -u`;
 
 # Success
 exit 0
-""".format(input=input, output=output, ref=ref, refbase=os.path.basename(ref), filtered=filtered, bestn=bestn))
+""".format(cmd_rgn=cmd_rgn, input=input, output=output, ref=ref, refbase=os.path.basename(ref), bestn=bestn, ncand=ncand))
 
 if __name__ == "__main__":
     from argparse import ArgumentParser

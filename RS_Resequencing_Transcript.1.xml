@@ -20,7 +20,7 @@
       <input type="radio" value="inactive" />
     </param>
     <param name="reference" editableInJob="true">
-      <value>common/references/gencode_v12_pc_transcripts</value>
+        <value>references/gencode_v13</value>
       <select>
         <import contentType="text/xml" element="reference" name="name" value="directory" filter="state='active' type='sample'" isPath="true">common/references/index.xml</import>
       </select>
@@ -42,7 +42,7 @@
       <description>BLASR maps reads to genomes by finding the highest scoring local alignment or set of local alignments between the read and the genome. The first set of  alignments is found by querying an index of the reference genome, and then refining until only high scoring alignments are retained. The base assignment in alignments is optimized and scored using all available quality information, such as insertion and deletion quality values.</description>
       <param name="maxHits" label="Maximum number of hits per read">
         <title>The maximum number of matches of each read to the reference sequence that will be evaluated.</title>
-        <value>1</value>
+        <value>10</value>
         <input type="text" />
         <rule type="digits" message="Value must be an integer between 0 and 1000" />
       </param>
@@ -59,11 +59,11 @@
         <rule type="digits" message="Value must be an integer between 8 and 30" />
       </param>
       <param name="samBam" label="Write output as a BAM file">
-        <value>True</value>
+        <value>False</value>
         <input type="checkbox" />
       </param>
       <param name="align_opts" hidden="true">
-         <value>--minAccuracy=0.75 --minLength=50</value>
+         <value>--minAccuracy=0.75 --minLength=50 --multiple=all</value>
       </param>
     </module>
   </moduleStage>
