@@ -16,7 +16,9 @@ from matplotlib.ticker import NullFormatter, LinearLocator
 
 from scipy.stats import mode, mstats
 
+from csv import DictReader
 from collections import defaultdict
+from bx.intervals.intersection import IntervalTree
 
 def getMaxCoveredRefMatch(alns, refLengthDict):
     """
@@ -44,46 +46,83 @@ def group_by_inserts(alns, inss):
                 break
         if not found:
             raise Exception, "alignment not found within inserts!!! Not OK!!!"
+    
+    # if doing something weird like partial alignment, comment the raise Exception above and use this!
+#    i = 0
+#    while i < len(grouped):
+#        if len(grouped[i]) == 0:
+#            grouped.pop(i)
+#        else: i += 1
+
     return grouped
 
-def getPolyAT(filename):
+def getPrimerInfo(filename):
     """
-    Read polyAT report file (from seqclean)
-    Movie   HoleNumber      rStart  rEnd
+    Read .primer_info.txt from running parse_seq_clean.py
+    <ID> <5seen> <polyAseen> <3seen>
     
-    Returns a dict of (movieName, holeNumber) --> list of (start, end) of polyAT
+    Returns: dict of (movie, hn) --> IntervalTree with dict record of {'ID', '5seen', 'polyAseen', '3seen'}
     """
-    from csv import DictReader
-    d = defaultdict(lambda: [])
-    for r in DictReader(open(filename), delimiter='\t'):
-        d[(r['Movie'],r['HoleNumber'])].append((int(r['rStart']), int(r['rEnd'])))
+    d = defaultdict(lambda: IntervalTree())
+    with open(filename) as f:
+        for r in DictReader(f, delimiter='\t'):
+            movie, hn, s_e = r['ID'].split('/')
+            s, e = map(int, s_e.split('_'))
+            d[(movie, hn)].insert(s, e, r)
     return d
+
+# OBSOLETE! Use PrimerInfo
+#def getPolyAT(filename):
+#    """
+#    Read polyAT report file (from seqclean)
+#    Movie   HoleNumber      rStart  rEnd
+#    
+#    Returns a dict of (movieName, holeNumber) --> list of (start, end) of polyAT
+#    """
+#    from csv import DictReader
+#    d = defaultdict(lambda: [])
+#    for r in DictReader(open(filename), delimiter='\t'):
+#        d[(r['Movie'],r['HoleNumber'])].append((int(r['rStart']), int(r['rEnd'])))
+#    return d
         
 def hasPolyAT(d, movie, hn, start, end):
     """
     Best used with functools.partial to create a boolean function for checking
     whether an insert is in the dictionary
+    
+    NOTE: now modified to work with primer_info.txt
+    NOTE: returns True iff 5seen=='1' and 3seen=='1' !!! polyA actually ignored.
     """
     k = movie, hn
     if k not in d:
         return False
-    for s, e in d[k]:
-        if s <= start < end <= e:
-            return True
-    return False    
+    
+    item = d[k].find(start, end)
+    if len(item) == 0:
+        return False
+    elif len(item) == 1:
+        rec = item[0]
+        assert rec['5seen'] in ('0', '1') and rec['3seen'] in ('0', '1')
+        return rec['5seen'] == '1' and rec['3seen'] == '1'
+    else:
+        raise Exception, "Impossible to have {0}/{1}/{2}_{3}!!".format(movie, hn, start, end)
+  
 
 def getInsertsFromBasH5(bash5FN, func_is_polyAT):
+    """
+    Reads through a single .bas.h5 and return an array of
+    
+    HoleNumber, rStart, rEnd, IsFullPass, IsHQTrimmed, IsLongest, IsAT
+    
+    NOTE: IsLongest not always equate to IsFullPass esp. with StageStart
+    NOTE: IsAT is actually set according to 5seen & 3seen. Check function definition!!
+    """
     bash5 = BasH5(bash5FN)
     rgnTable = bash5.rgnTable
-    data = []
-    
+    data = []    
 
-    good, bad = 0,0
-    dummy = 1
     if 'Adapter' in bash5.rgnTable.rgnDS.attrs.get('RegionTypes',[]):
         for hn in bash5.getSequencingZMWs():
-            #print dummy
-            dummy += 1
             # get indices first
             adapters = rgnTable.getAdapterRegionForZMW(hn)
             hqregion = rgnTable.getHQRegionForZMW(hn)
@@ -97,32 +136,13 @@ def getInsertsFromBasH5(bash5FN, func_is_polyAT):
             hqinserts = filter(lambda ins: hqStart<=ins[0]<hqEnd or hqStart<=ins[1]<hqEnd, inserts)
             if len(hqinserts) == 0:
                 continue
-            #max_insert_length = max(i[1]-i[0] for i in hqinserts)
-            #max_insert_length = 0
 
             for i in hqinserts:
-                #print "Examining", i
                 iStart, iEnd = list(i)
 
-
-                # LIZ: no longer needed this part as I pre-filtered to hqinserts
-#                is_in_hq = hqStart <= iStart < hqEnd or hqStart <= iEnd < hqEnd
-#                if not is_in_hq:
-#                    continue
-
-#                # check if any part of insert in HQRegion
-#                hqRange = range(hqStart, hqEnd)
-#                if not iStart in hqRange and not iEnd in hqRange:
-#                    #print "Insert not in HQRange", hqregion
-#                    continue
-
                  # check if insert is full pass
-                isFullPass = iStart in adapterEnds and iEnd in adapterStarts
-                
-                # technically this is not always right if HQtrim happens, but oh well should be OK
-                #isLongest = (iEnd-iStart) == max_insert_length
-                isLongest = False # for now set everything to false, re-set at the end
-                
+                isFullPass = iStart in adapterEnds and iEnd in adapterStarts                
+                isLongest = False # for now set everything to false, re-set at the end                
                 isHQTrimmed = False
                 # trim by HQRegion
                 if iStart < hqStart:
@@ -150,16 +170,21 @@ def getInsertsFromBasH5(bash5FN, func_is_polyAT):
     return data
         
 def getInsertsFromFofn(inputFOFN, primer_match_filename):
-    import functools
+    """
+    primer_match_filename should be .primer_info.txt
     
-    primer_match_dict = getPolyAT(primer_match_filename)
-    
-    files = [x.strip() for x in open(inputFOFN, 'r')]
+    Returns: dict of movieName --> array from reading .bas.h5
+    """
+    import functools    
+    primer_match_dict = getPrimerInfo(primer_match_filename)
     inserts = {}
-    for f in files:
-        print "Reading", f
-        movieName = sub('.pls.h5|.bas.h5', '', os.path.basename(f))
-        inserts[movieName] = getInsertsFromBasH5(f, functools.partial(hasPolyAT, primer_match_dict, movieName))
+    
+    with open(inputFOFN) as f:
+        for line in f:
+            filename = line.strip()
+            print "Reading", filename
+            movieName = sub('.pls.h5|.bas.h5', '', os.path.basename(filename))
+            inserts[movieName] = getInsertsFromBasH5(filename, functools.partial(hasPolyAT, primer_match_dict, movieName))
 
     return inserts
 
@@ -168,6 +193,10 @@ def getReferenceLengths(cmph5):
 
 
 def getAlignedLengthRatios(cmph5, inserts):
+    """
+    Expects that BLASR could've been run with -bestN > 1.
+    Given multiple ref hits, reports just the one with the *max ref coverage*
+    """
     aIdx = cmph5['/AlnInfo'].asRecArray()
     refLengthDict = cmph5['/RefInfo'].asDict("ID", "Length", cache=True)
     refIdDict = cmph5['/RefGroup'].asDict("ID", "RefInfoID", cache=True)
@@ -211,27 +240,7 @@ def getAlignedLengthRatios(cmph5, inserts):
                     iIsAT = i['IsAT']
 
                     results.append((movieID, refIdDict[refGroupID], hn, rStart, rEnd, tStart, tEnd, iStart, iEnd, refLength, iIsFullPass, iIsHQTrimmed, iIsLongest, iIsAT))
-                
 
-#                for a in alns:
-#                    rStart = a['rStart']
-#                    rEnd = a['rEnd']
-#                    tStart = a['tStart']
-#                    tEnd = a['tEnd']
-#                    refGroupID = a['RefGroupID']
-#                    refLength = refLengthDict[refIdDict[refGroupID]]
-#
-#                    for i in inss:
-#                        iStart = i['rStart']
-#                        iEnd = i['rEnd']
-#                        iIsFullPass = i['IsFullPass']
-#                        iIsHQTrimmed = i['IsHQTrimmed']
-#                        iIsLongest = i['IsLongest']
-#                        iIsAT = i['IsAT']
-#
-#                        if rStart >= iStart and rEnd <= iEnd:
-#                            results.append((movieID, refIdDict[refGroupID], hn, rStart, rEnd, tStart, tEnd, iStart, iEnd, refLength, iIsFullPass, iIsHQTrimmed, iIsLongest, iIsAT))
-#
     return n.array(results, dtype=[('MovieID', '<i2'), ('RefID', '<i4'), ('HoleNumber', '<i4'),
                                    ('rStart', '<i4'), ('rEnd', '<i4'),
                                    ('tStart', '<i4'), ('tEnd', '<i4'),
@@ -253,6 +262,8 @@ def makeFractionSubreadHistogram(alnRatios, outfile, format):
     for l, label in zip((alnRatios, HQRegion, fullPass, Longest, AT), ("All Subreads", "HQRegion Subreads", "HQRegion Full-Pass Subreads", "HQRegion Longest Subreads", "HQRegion " + SeenName)):
         alnLength = l['rEnd'] - l['rStart']
         srLength = l['iEnd'] - l['iStart']
+        if len(srLength) == 0:
+            continue
         alnSubRatio = alnLength.astype(float) / srLength.astype(float)
         ax.hist(alnSubRatio, bins=100, histtype='step', label=label)
 
@@ -261,10 +272,13 @@ def makeFractionSubreadHistogram(alnRatios, outfile, format):
     ax.set_ylabel("Count")
     fig.savefig(outfile, format=format)
 
-def makeSubreadRLHistogram(alnRatios, outfile, format, quantile=None):
+def makeSubreadRLHistogram(alnRatios, outfile, format, quantile=None, ylim=None):
     fig = plt.figure(dpi=300, figsize=(10, 6))
     ax = fig.add_subplot(111)
     ax.set_title("Aligned Subread RL Histogram")
+    
+    if ylim is not None:
+        plt.ylim(ylim)
 
     fullPass = alnRatios[alnRatios['IsFullPass']]
     HQRegion = alnRatios[n.any([alnRatios['IsFullPass'], alnRatios['IsHQTrimmed']], axis=0)]
@@ -273,12 +287,14 @@ def makeSubreadRLHistogram(alnRatios, outfile, format, quantile=None):
     
     for l, label in zip((alnRatios, HQRegion, fullPass, Longest, AT), ("All Subreads", "HQRegion Subreads", "HQRegion Full-Pass Subreads", "HQRegion Longest Subreads", "HQRegion " + SeenName)):
         srLength = l['iEnd'] - l['iStart']
+        if len(srLength) == 0:
+            continue
 
-        if not quantile == None:
+        if quantile is not None:
             srLength = srLength[srLength < mstats.mquantiles(srLength, [quantile])[0]]
 
         ax.hist(srLength, bins=100, histtype='step', label=label)
-
+        
     ax.legend(loc='upper right', ncol=1)
     ax.set_xlabel("Subread Length")
     ax.set_ylabel("Count")
@@ -296,6 +312,8 @@ def makeFractionReferenceHistogram(alnRatios, outfile, format):
     
     for l, label in zip((alnRatios, HQRegion, fullPass, Longest, AT), ("All Subreads", "HQRegion Subreads", "HQRegion Full-Pass Subreads", "HQRegion Longest Subreads", "HQRegion " + SeenName)):    
         alnLength = l['tEnd'] - l['tStart']
+        if len(alnLength) == 0:
+            continue
         refLength = l['RefLength']
         alnSubRatio = alnLength.astype(float) / refLength.astype(float)
         ax.hist(alnSubRatio, bins=100, histtype='step', label=label)
@@ -316,6 +334,8 @@ def makeReferenceRLHistogram(alnRatios, refLengths, outfile, format, quantile=No
     max_y = 0
     for l, label in zip((alnRatios, HQRegion, fullPass), ("Aln from All Subreads", "Aln from HQRegion Subreads", "Aln from HQRegion Full-Pass Subreads")):
         alnRefLength = l['RefLength']
+        if len(alnRefLength) == 0:
+            continue
 
         if not quantile == None:
             alnRefLength = alnRefLength[alnRefLength < mstats.mquantiles(alnRefLength, [quantile])[0]]
@@ -559,7 +579,7 @@ def make_RefDict(cmpH5):
     """
     Return a dict of RefID --> RefName
     """
-    return cmpH5['/MovieInfo'].asDict('ID', 'FullName')
+    return cmpH5['/RefInfo'].asDict('ID', 'FullName')
 
 if __name__ == "__main__":
     global SeenName
@@ -571,6 +591,7 @@ if __name__ == "__main__":
     parser.add_argument('-p', '--output_prefix')
     parser.add_argument('-t', '--output_type')
     parser.add_argument('--read_pickle')
+    parser.add_argument("--subread_rl_ylim", default=None)
     args = parser.parse_args()
 
     inFOFN = os.path.join(args.job_directory, "input.fofn")
@@ -602,13 +623,12 @@ if __name__ == "__main__":
         pp = PdfPages(os.path.join(args.output_directory, args.output_prefix + ".figures.pdf"))
 
         print "Creating pdf plots"
-        makeSubreadRLHistogram(alnRatios, pp, "pdf", 0.99)
+        makeSubreadRLHistogram(alnRatios, pp, "pdf", 0.99, ylim=eval(args.subread_rl_ylim) if args.subread_rl_ylim is not None else None)       
         makeFractionSubreadHistogram(alnRatios, pp, "pdf")
         makeReferenceRLHistogram(alnRatios, refLengths, pp, "pdf", 0.99)
         makeAlignmentPercentileDistribution(alnRatios, pp, "pdf")
         makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", "IsLongest", "Longest")
         makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", "IsAT", SeenName)
-        #makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", "IsAT", SeenName, (1000,2000))
         makeFractionReferenceHistogram(alnRatios, pp, "pdf")
         makeSubreadLengthVsReferenceLengthHexbinHist(alnRatios, pp, "pdf")
         makeSubreadLengthVsReferenceLengthHexbinHist(alnRatios, pp, "pdf", "IsLongest", "Longest")
@@ -623,7 +643,8 @@ if __name__ == "__main__":
     
         pp.close()
     elif args.output_type == "png":
-        
+        print >> sys.stderr, "Liz: made too many changes to PDF version. PNG version currently NOT supported."
+        sys.exit(-1)
         makeSubreadRLHistogram(alnRatios, _fn(args.output_directory, args.output_prefix, "subread_hist", ".png"), "png", 0.99)
         makeFractionSubreadHistogram(alnRatios, _fn(args.output_directory, args.output_prefix, "frac_subread", ".png"), "png")
         makeReferenceRLHistogram(alnRatios, refLengths, _fn(args.output_directory, args.output_prefix, "ref_hist", ".png"), "png", 0.99)
