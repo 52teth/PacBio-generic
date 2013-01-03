@@ -6,7 +6,7 @@ import os, sys
 import numpy as n
 from re import sub
 import argparse
-import pickle
+import cPickle
 import pdb
 import itertools
 
@@ -109,7 +109,7 @@ def hasPolyAT(d, movie, hn, start, end):
         assert rec['5seen'] in ('0', '1') and rec['3seen'] in ('0', '1')
         return rec['5seen'] == '1' and rec['3seen'] == '1'
     else:
-        raise Exception, "Impossible to have {0}/{1}/{2}_{3}!!".format(movie, hn, start, end)
+        print >> sys.stderr, "Impossible to have {0}/{1}/{2}_{3}!! I probably hacked something".format(movie, hn, start, end)
   
 
 def getInsertsFromBasH5(bash5FN, func_is_polyAT):
@@ -242,15 +242,16 @@ def getAlignedLengthRatios(cmph5, inserts):
                     iIsHQTrimmed = i['IsHQTrimmed']
                     iIsLongest = i['IsLongest']
                     iIsAT = i['IsAT']
+                    refStrand = a['RCRefStrand']
 
-                    results.append((movieID, refIdDict[refGroupID], hn, rStart, rEnd, tStart, tEnd, iStart, iEnd, refLength, iIsFullPass, iIsHQTrimmed, iIsLongest, iIsAT))
+                    results.append((movieID, refIdDict[refGroupID], hn, rStart, rEnd, tStart, tEnd, iStart, iEnd, refLength, iIsFullPass, iIsHQTrimmed, iIsLongest, iIsAT, refStrand))
 
     return n.array(results, dtype=[('MovieID', '<i2'), ('RefID', '<i4'), ('HoleNumber', '<i4'),
                                    ('rStart', '<i4'), ('rEnd', '<i4'),
                                    ('tStart', '<i4'), ('tEnd', '<i4'),
                                    ('iStart', '<i4'), ('iEnd', '<i4'), ('RefLength', '<i4'),
                                    ('IsFullPass', n.bool), ('IsHQTrimmed', n.bool), ('IsLongest', n.bool),
-                                   ('IsAT', n.bool)])
+                                   ('IsAT', n.bool), ('refStrand', '<i4')])
                                         
 
 def makeFractionSubreadHistogram(alnRatios, outfile, format):
@@ -366,7 +367,7 @@ def makeReferenceRLHistogram(alnRatios, refLengths, outfile, format, quantile=No
     ax.set_ylabel("Density")
     fig.savefig(outfile, format=format)
 
-def makeAlignmentPercentileDistribution(alnRatios, outfile, format, alnKey='IsFullPass', label='Full-Pass', refLengthRange=None, per_gene=False):
+def makeAlignmentPercentileDistribution(alnRatios, outfile, format, alnKey='IsFullPass', label='Full-Pass', refLengthRange=None, per_gene=False, refStrandDict=None):
     """
     This is the 5'-3' reference coverage plot
     
@@ -376,7 +377,7 @@ def makeAlignmentPercentileDistribution(alnRatios, outfile, format, alnKey='IsFu
     fig = plt.figure(dpi=300, figsize=(8, 8))
     ax1 = fig.add_subplot(211)
     #ax1.set_title("Normalized Reference Start/End Positions")
-    title = "Alignment Reference Start/End Positions ({0} Subreads only)".format(label)
+    title = "Reference coverage ({0} only, qStart<100)".format(label)
     if per_gene:
         title += ",per_gene"
     ax1.set_title(title)   
@@ -389,9 +390,13 @@ def makeAlignmentPercentileDistribution(alnRatios, outfile, format, alnKey='IsFu
         ax2.set_title("Reference Coverage (size:{0}-{1})".format(refLengthRange[0], refLengthRange[1]))
     
     if refLengthRange is None:
-        fullPass = alnRatios[alnRatios[alnKey]]
+        fullPass = alnRatios[alnRatios[alnKey]&(alnRatios['rStart']-alnRatios['iStart']<100)]
     else:
-        fullPass = alnRatios[alnRatios[alnKey]&(refLengthRange[0]<=alnRatios['RefLength'])&(alnRatios['RefLength']<=refLengthRange[1])]
+        fullPass = alnRatios[alnRatios[alnKey]&(alnRatios['rStart']-alnRatios['iStart']<100)&(refLengthRange[0]<=alnRatios['RefLength'])&(alnRatios['RefLength']<=refLengthRange[1])]
+        
+    if len(fullPass) == 0:
+        print >> sys.stderr, "Not drawing reference coverage for {0}!!".format(label)
+        return
         
     if per_gene:
         refLength = []
@@ -409,12 +414,32 @@ def makeAlignmentPercentileDistribution(alnRatios, outfile, format, alnKey='IsFu
                     e = x['tEnd'].astype(float) / reflen
             assert max_cov > 0
             refLength.append(reflen)
-            startPercentile.append(s)
-            endPercentile.append(e)            
-    else:                
-        refLength = fullPass['RefLength']
-        startPercentile = fullPass['tStart'].astype(float) / refLength.astype(float)
-        endPercentile = fullPass['tEnd'].astype(float) / refLength.astype(float)
+            if refStrandDict is None or refStrandDict[refID]=='+':
+                startPercentile.append(s)
+                endPercentile.append(e)
+            else:
+                startPercentile.append(1-e)
+                endPercentile.append(1-s)
+                            
+    else:    
+        if refStrandDict is None:            
+            refLength = fullPass['RefLength']
+            startPercentile = fullPass['tStart'].astype(float) / refLength.astype(float)
+            endPercentile = fullPass['tEnd'].astype(float) / refLength.astype(float)
+        else:
+            startPercentile = []
+            endPercentile = []
+            for x in fullPass:
+                reflen = x['RefLength']*1.
+                s = x['tStart'].astype(float) / reflen
+                e = x['tEnd'].astype(float) / reflen
+                if refStrandDict[x['RefID']] == '+':
+                    startPercentile.append(s)
+                    endPercentile.append(e)
+                else:
+                    startPercentile.append(1-e)
+                    endPercentile.append(1-s)
+                    
 
     max_y = 0
     for l, label, color in itertools.izip([startPercentile, endPercentile], ['Alignment Start', 'Alignment End'], ('#FF33CC', '#0000CC')):
@@ -446,27 +471,38 @@ def makeCoverage_by_RefLength(alnRatios, outfile, format, alnKey='IsFullPass', l
     X = n.round(refLength, decimals=-2)
     Y = n.round(endPercentile - startPercentile, decimals=2)
     
-#    fig = plt.figure(dpi=300, figsize=(8, 8))
-#    ax = fig.add_subplot(111)
-#    ax.set_title("TEST")
-#    ax.hist2d(X, Y, bins=100, norm=matplotlib.colors.LogNorm,normed=True)   
-#    fig.savefig(outfile, format=format)
-
     _makeHexbinHist(X, Y, "Reference Length", "Normalized Reference Coverage", title, outfile, format, quantile=0.99)
 
-def makeStartPositionVS(alnRatios, outfile, format, alnKey='IsFullPass', label='Full-Pass'):
+def makeStartPositionVS(alnRatios, outfile, format, alnKey='IsFullPass', label='Full-Pass', refStrandDict=None):
     title = label + " Subreads vs Reference alignment start"
     fullPass = alnRatios[alnRatios[alnKey]]
-    X = fullPass['tStart'].astype(float)
-    Y = (fullPass['rStart'] - fullPass['iStart']).astype(float)
     
+    if refStrandDict is None:
+        X = fullPass['tStart'].astype(float)
+        Y = (fullPass['rStart'] - fullPass['iStart']).astype(float)
+    else:
+        X = []
+        Y = (fullPass['rStart'] - fullPass['iStart']).astype(float)
+        for x in fullPass:
+            if refStrandDict[x['RefID']] == '+': X.append(x['tStart'].astype(float))
+            else: X.append((x['RefLength']-x['tEnd']).astype(float))
+        X = n.array(X)
+                    
     _makeHexbinHist(X, Y, "Reference alignment start", "Subread alignment start", title, outfile, format, quantile=0.99)
 
-def makeEndPositionVS(alnRatios, outfile, format, alnKey='IsFullPass', label='Full-Pass'):
+def makeEndPositionVS(alnRatios, outfile, format, alnKey='IsFullPass', label='Full-Pass', refStrandDict=None):
     title = label + " Subreads vs Reference alignment distance from end"
     fullPass = alnRatios[alnRatios[alnKey]]
-    X = (fullPass['RefLength'] - fullPass['tEnd']).astype(float)
-    Y = (fullPass['iEnd'] - fullPass['rEnd']).astype(float)
+    if refStrandDict is None:
+        X = (fullPass['RefLength'] - fullPass['tEnd']).astype(float)
+        Y = (fullPass['iEnd'] - fullPass['rEnd']).astype(float)
+    else:
+        X = []
+        Y = (fullPass['iEnd'] - fullPass['rEnd']).astype(float)
+        for x in fullPass:
+            if refStrandDict[x['RefID']] == '+': X.append((x['RefLength']-x['tEnd']).astype(float))
+            else: X.append(x['tStart'].astype(float))
+        X = n.array(X)
     
     _makeHexbinHist(X, Y, "Distance from ref end", "Distance from subread end", title, outfile, format, quantile=0.99)
     
@@ -529,7 +565,7 @@ def makeRefLengthVSAbundance(alnRatios, outfile, format, alnKey='IsFullPass', la
         X.append(x)
         Y.append(y)
         Z.append(z*20)
-        print >> sys.stderr, x, y, z
+        #print >> sys.stderr, x, y, z
     
     ax.scatter(X, Y, Z, alpha=0.7, marker='o', facecolor='#3399FF')
     ax.set_xlabel("Reference Length")
@@ -664,24 +700,27 @@ def write_summary_page(pdf_filename, args, inserts, alnRatios):
     for file in open(inFOFN):
         elements.append(Paragraph(os.path.basename(file), styles['Normal']))
         
-    elements.append(Paragraph("""
-    <br/>
-    <br/>
-    Subread alignment summary:
-    <br/>
-    """, styles['Normal']))
-        
     data = []
     
     total  = 0
     fullpass = 0
     longest = 0
     AT = 0
+    seq_ZMWs = 0
     for ins in inserts.itervalues(): 
         total += len(ins)
         fullpass += len(ins[ins['IsFullPass']])
         longest += len(ins[ins['IsLongest']])
         AT += len(ins[ins['IsAT']])
+        seq_ZMWs += len(n.unique(ins['HoleNumber']))
+                     
+    elements.append(Paragraph("""
+    <br/>
+    Number of sequencing ZMWs: {0}
+    <br/>
+    Subread alignment summary:
+    <br/>
+    """.format(seq_ZMWs), styles['Normal']))
         
     data.append(["Subread Type", "Original", "Aligned", "Unique RefIDs aligned to"])
     data.append(["Total", total, len(alnRatios), len(set(alnRatios[:]['RefID']))])
@@ -721,6 +760,7 @@ if __name__ == "__main__":
     parser.add_argument('-t', '--output_type')
     parser.add_argument('--read_pickle')
     parser.add_argument("--ref_size", default=None)
+    parser.add_argument("--refStrandPickle", default=None)
     args = parser.parse_args()
     
     ref_size = None
@@ -735,19 +775,31 @@ if __name__ == "__main__":
     refLengths = getReferenceLengths(cmpH5)
 
     if args.read_pickle:
-        stuff = pickle.load(open(args.read_pickle, 'rb'))
+        stuff = cPickle.load(open(args.read_pickle, 'rb'))
         if type(stuff) is dict:
             inserts = stuff['inserts']
             alnRatios = stuff['alns']
+            refDict = stuff['RefDict']
         else:
             inserts, alnRatios = stuff
-    else:
-    
+    else:    
         print "Reading inserts from input.fofn"
         inserts = getInsertsFromFofn(inFOFN, args.primer_match_file)
         print "Gathering alignment lengths"
         alnRatios = getAlignedLengthRatios(cmpH5, inserts)
-        pickle.dump({'inserts':inserts,'alns':alnRatios,'MovieDict':make_MovieDict(cmpH5),'RefDict':make_RefDict(cmpH5)}, open(os.path.join(args.output_directory, args.output_prefix + ".pkl"), 'wb'))
+        refDict = make_RefDict(cmpH5)
+        cPickle.dump({'inserts':inserts,'alns':alnRatios,'MovieDict':make_MovieDict(cmpH5),'RefDict':refDict}, open(os.path.join(args.output_directory, args.output_prefix + ".pkl"), 'wb'))
+        
+    # make refStrandDict if needed
+    refStrandDict = None
+    if args.refStrandPickle is not None:
+        print "Making refStrandDict"
+        with open(args.refStrandPickle) as f:
+            transcript_info = cPickle.load(f)
+        refStrandDict = {}
+        for refid, refname in refDict.iteritems():
+            if refname.find('|') > 0: refname = refname[:refname.find('|')]
+            refStrandDict[refid] = transcript_info[refname]['strand']
 
     write_summary_page(os.path.join(args.output_directory, args.output_prefix + '.summary.pdf'), args, inserts, alnRatios)
     #sys.exit(-1)
@@ -758,21 +810,21 @@ if __name__ == "__main__":
         makeSubreadRLHistogram(alnRatios, pp, "pdf", 0.99)       
         makeFractionSubreadHistogram(alnRatios, pp, "pdf")
         makeReferenceRLHistogram(alnRatios, refLengths, pp, "pdf", 0.99)
-        makeAlignmentPercentileDistribution(alnRatios, pp, "pdf")
-        makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", "IsLongest", "Longest")
-        makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", "IsAT", SeenName)
-        makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", per_gene=True)
-        makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", "IsLongest", "Longest", per_gene=True)
-        makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", "IsAT", SeenName, per_gene=True)
+        makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", refStrandDict=refStrandDict)
+        makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", "IsLongest", "Longest", refLengthRange=ref_size, refStrandDict=refStrandDict)
+        makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", "IsAT", SeenName, refLengthRange=ref_size, refStrandDict=refStrandDict)
+        makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", per_gene=True, refLengthRange=ref_size, refStrandDict=refStrandDict)
+        makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", "IsLongest", "Longest", per_gene=True, refLengthRange=ref_size, refStrandDict=refStrandDict)
+        makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", "IsAT", SeenName, per_gene=True, refLengthRange=ref_size, refStrandDict=refStrandDict)
         makeCoverage_by_RefLength(alnRatios, pp, 'pdf')
         makeCoverage_by_RefLength(alnRatios, pp, 'pdf', 'IsLongest', 'Longest')
         makeCoverage_by_RefLength(alnRatios, pp, 'pdf', 'IsAT', SeenName)
-        makeStartPositionVS(alnRatios, pp, 'pdf')
-        makeStartPositionVS(alnRatios, pp, 'pdf', 'IsLongest', 'Longest')
-        makeStartPositionVS(alnRatios, pp, 'pdf', 'IsAT', SeenName)
-        makeEndPositionVS(alnRatios, pp, 'pdf')
-        makeEndPositionVS(alnRatios, pp, 'pdf', 'IsLongest', 'Longest')
-        makeEndPositionVS(alnRatios, pp, 'pdf', 'IsAT', SeenName)
+        makeStartPositionVS(alnRatios, pp, 'pdf', refStrandDict=refStrandDict)
+        makeStartPositionVS(alnRatios, pp, 'pdf', 'IsLongest', 'Longest', refStrandDict=refStrandDict)
+        makeStartPositionVS(alnRatios, pp, 'pdf', 'IsAT', SeenName, refStrandDict=refStrandDict)
+        makeEndPositionVS(alnRatios, pp, 'pdf', refStrandDict=refStrandDict)
+        makeEndPositionVS(alnRatios, pp, 'pdf', 'IsLongest', 'Longest', refStrandDict=refStrandDict)
+        makeEndPositionVS(alnRatios, pp, 'pdf', 'IsAT', SeenName, refStrandDict=refStrandDict)
         #makeRefAbundance(alnRatios, pp, 'pdf') # currently OBSOLETE
         makeRefLengthVSAbundance(alnRatios, pp, 'pdf', 'IsAT', SeenName)
         makeRefLengthVSAbundance(alnRatios, pp, 'pdf', 'IsAT', SeenName, covThreshold=.1)
@@ -781,17 +833,12 @@ if __name__ == "__main__":
         makeSubreadLengthVsReferenceLengthHexbinHist(alnRatios, pp, "pdf", "IsLongest", "Longest")
         makeSubreadLengthVsReferenceLengthHexbinHist(alnRatios, pp, "pdf", "IsAT", SeenName)
         #makeSubreadLengthVsReferenceLengthHexbinHist_LongestSubreadOnly(alnRatios, pp, "pdf", "IsAT", SeenName)
-        makeFractionReferencevsFractionSubreadHexbinHist(alnRatios, pp, "pdf")
-        makeFractionReferencevsFractionSubreadHexbinHist(alnRatios, pp, "pdf", "IsLongest", "Longest")
-        makeFractionReferencevsFractionSubreadHexbinHist(alnRatios, pp, "pdf", "IsAT", SeenName)
-        if ref_size is not None:
-            makeFractionReferencevsFractionSubreadHexbinHist(alnRatios, pp, "pdf", refLengthRange=ref_size)
-            makeFractionReferencevsFractionSubreadHexbinHist(alnRatios, pp, "pdf", "IsLongest", "Longest", refLengthRange=ref_size)
-            makeFractionReferencevsFractionSubreadHexbinHist(alnRatios, pp, "pdf", "IsAT", SeenName, refLengthRange=ref_size)
+        makeFractionReferencevsFractionSubreadHexbinHist(alnRatios, pp, "pdf", refLengthRange=ref_size)
+        makeFractionReferencevsFractionSubreadHexbinHist(alnRatios, pp, "pdf", "IsLongest", "Longest", refLengthRange=ref_size)
+        makeFractionReferencevsFractionSubreadHexbinHist(alnRatios, pp, "pdf", "IsAT", SeenName, refLengthRange=ref_size)
         makeFractionReferencevsReferenceLengthHexbinHist(alnRatios, pp, "pdf")
         makeFractionReferencevsReferenceLengthHexbinHist(alnRatios, pp, "pdf", "IsLongest", "Longest")
-        makeFractionReferencevsReferenceLengthHexbinHist(alnRatios, pp, "pdf", "IsAT", SeenName)
-    
+        makeFractionReferencevsReferenceLengthHexbinHist(alnRatios, pp, "pdf", "IsAT", SeenName)    
         pp.close()
     elif args.output_type == "png":
         print >> sys.stderr, "Liz: made too many changes to PDF version. PNG version currently NOT supported."

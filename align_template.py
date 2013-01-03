@@ -45,7 +45,7 @@ def main(input_dir, ref, **kwargs):
 """
 echo 'Started on' `date -u`;
 
-compareSequences.py --info --useGuidedAlign --algorithm=blasr --multiple=all --nproc=15  --noXML --h5mode=w --h5fn={output} --minAccuracy=0.75 --minLength=50  -x -minMatch 12 -x -bestn {bestn} -x -nCandidates {ncand} -x -minPctIdentity 70.0 -x -sa {ref}/sequence/{refbase}.fasta.sa --tmpDir=/scratch {cmd_rgn} "{input}" "{ref}" || exit $?;
+compareSequences.py --info --useGuidedAlign --algorithm=blasr --multiple=all --nproc=12  --noXML --h5mode=w --h5fn={output} --minAccuracy=0.75 --minLength=50  -x -minMatch 12 -x -bestn {bestn} -x -nCandidates {ncand} -x -minPctIdentity 70.0 -x -sa {ref}/sequence/{refbase}.fasta.sa --tmpDir=/scratch {cmd_rgn} "{input}" "{ref}" || exit $?;
 echo 'Alignment Complete' || exit $?;
 date || exit $?;
 loadPulses {input} {output} -metrics DeletionQV,IPD,InsertionQV,PulseWidth,QualityValue,MergeQV,SubstitutionQV,DeletionTag -byread || exit $?;
