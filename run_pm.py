@@ -11,7 +11,7 @@ Then it does everything needed for primer_match/
 """
 
 barcode_trimmer_option = "" # none means 5'-3'
-barcode_trimmer_prefix = ".53seen_trimmed" # should correspond to the option above
+barcode_trimmer_prefix = "53seen_trimmed" # should correspond to the option above
 
 for name in os.listdir('runs/'):
     smrt_d = os.path.join('smrtpipe', name, 'data')
@@ -63,7 +63,7 @@ for name in os.listdir('runs/'):
                 fa_ccs2, out_ccs, barcode_trimmer_option, pm_d, barcode_trimmer_prefix)
     if os.system(cmd)!=0:
         print >> sys.stderr, "Trouble running {0}".format(cmd)
-    cmd = "count_5seen.py {0}/filtered_CCS_subreads.{2}.fa.primer_info.txt {1} > {0}/filtered_CCS_subreads.{2}.fa.primer_info.txt.summary".format(pm_d, fa_all2, barcode_trimmer_prefix)
+    cmd = "count_5seen.py {0}/filtered_CCS_subreads.{2}.fa.primer_info.txt {1} > {0}/filtered_CCS_subreads.{2}.fa.primer_info.txt.summary".format(pm_d, fa_ccs2, barcode_trimmer_prefix)
     os.system(cmd)
 
     

@@ -602,34 +602,65 @@ def makeRefLengthVSAbundance(alnRatios, outfile, format, alnKey='IsFullPass', la
     fig.savefig(outfile, format=format)
         
 def makeSubreadLengthVsReferenceLengthHexbinHist(alnRatios, outfile, format, alnKey='IsFullPass', title='Full-Pass'):
-    title = title + " Subread Length vs Reference Length"
+    title = title + " Subread Length vs Reference Length (per gene)"
     x_label = "Reference Length"
     y_label = "Subread Length"
 
     fullPass = alnRatios[alnRatios[alnKey]]
-    subreadLength = fullPass['iEnd'] - fullPass['iStart']
-    refLength = fullPass['RefLength']
+    
+    # do it per gene
+    refLength = []
+    subreadLength = []
+    for refID in n.unique(fullPass['RefID']):
+        max_cov = 0
+        reflen = 0
+        for x in fullPass[fullPass['RefID']==refID]:
+            reflen = x['RefLength']*1.
+            cov = x['tEnd'] - x['tStart']
+            if cov > max_cov:                    
+                max_cov = cov
+                sublen = x['iEnd'] - x['iStart']
+            assert max_cov > 0
+            refLength.append(reflen)
+            subreadLength.append(sublen)
+    refLength = n.array(refLength)
+    subreadLength = n.array(subreadLength)
+        
+    #subreadLength = fullPass['iEnd'] - fullPass['iStart']
+    #refLength = fullPass['RefLength']
     
     _makeHexbinHist(refLength, subreadLength, x_label, y_label, title, outfile, format, quantile=0.99)
 
 def makeFractionReferencevsReferenceLengthHexbinHist(alnRatios, outfile, format, alnKey='IsFullPass', label='Full-Pass'):
-    title = "Reference Length vs Fraction of Reference in Alignment ({0} Subreads only)".format(label)
+    title = "Reference Length vs Fraction of Reference in Alignment ({0} only, per-gene)".format(label)
     x_label = "Reference Length"
     y_label = "% of Reference Aligned"
 
     fullPass = alnRatios[alnRatios[alnKey]]
-    refLength = fullPass['RefLength']
-
-    #readAlnLength = fullPass['rEnd'] - fullPass['rStart']
-    refAlnLength = fullPass['tEnd'] - fullPass['tStart']
-
-    alnRefRatio = refAlnLength.astype(float) / refLength.astype(float) * 100.0
+    #refLength = fullPass['RefLength']
+    #refAlnLength = fullPass['tEnd'] - fullPass['tStart']
+    #alnRefRatio = refAlnLength.astype(float) / refLength.astype(float) * 100.0
+    
+    refLength = []
+    alnRefRatio = []
+    for refID in n.unique(fullPass['RefID']):
+        max_cov = 0
+        for x in fullPass[fullPass['RefID']==refID]:
+            cov = (x['tEnd'] - x['tStart'])*1. / x['RefLength']
+            if cov > max_cov:                    
+                max_cov = cov
+            assert max_cov > 0
+            refLength.append(x['RefLength'])
+            alnRefRatio.append(max_cov)    
+    
+    refLength = n.array(refLength)
+    alnRefRatio = n.array(alnRefRatio)
     
     _makeHexbinHist(refLength, alnRefRatio, x_label, y_label, title, outfile, format, quantile=0.99)
                             
 
 def makeFractionReferencevsFractionSubreadHexbinHist(alnRatios, outfile, format, alnKey='IsFullPass', label='Full-Pass', refLengthRange=None):
-    title = "Fraction of Reference and " + label + " Subread in Alignment"
+    title = "Fraction of Reference and " + label + " Subread in Alignment (per gene)"
     if refLengthRange is not None:
         title += " (ref range {0}-{1})".format(refLengthRange[0], refLengthRange[1])
     x_label = "Fraction of Reference in Alignment"
@@ -640,13 +671,31 @@ def makeFractionReferencevsFractionSubreadHexbinHist(alnRatios, outfile, format,
     else:
         fullPass = alnRatios[alnRatios[alnKey]&(refLengthRange[0]<=alnRatios['RefLength'])&(alnRatios['RefLength']<=refLengthRange[1])]
         
-    readAlnLength = fullPass['rEnd'] - fullPass['rStart']
-    refAlnLength = fullPass['tEnd'] - fullPass['tStart']
-    refLength = fullPass['RefLength']
-    insLength = fullPass['iEnd'] - fullPass['iStart']
+        
+    alnRefRatio = []
+    alnInsRatio = []
+    for refID in n.unique(fullPass['RefID']):
+        max_cov = 0
+        for x in fullPass[fullPass['RefID']==refID]:
+            cov = (x['tEnd'] - x['tStart'])*1. / x['RefLength']
+            if cov > max_cov:                    
+                max_cov = cov
+                subcov = (x['rEnd']-x['rStart'])*1./(x['iEnd']-x['iStart'])
+            assert max_cov > 0
+            alnRefRatio.append(max_cov)
+            alnInsRatio.append(subcov)
+            
+    
+    alnRefRatio = n.array(alnRefRatio)
+    alnInsRatio = n.array(alnInsRatio)
+                
+    #readAlnLength = fullPass['rEnd'] - fullPass['rStart']
+    #refAlnLength = fullPass['tEnd'] - fullPass['tStart']
+    #refLength = fullPass['RefLength']
+    #insLength = fullPass['iEnd'] - fullPass['iStart']
 
-    alnRefRatio = refAlnLength.astype(float) / refLength.astype(float)
-    alnInsRatio = readAlnLength.astype(float) / insLength.astype(float)
+    #alnRefRatio = refAlnLength.astype(float) / refLength.astype(float)
+    #alnInsRatio = readAlnLength.astype(float) / insLength.astype(float)
     
     _makeHexbinHist(alnRefRatio, alnInsRatio, x_label, y_label, title, outfile, format, quantile=0.99)
 
