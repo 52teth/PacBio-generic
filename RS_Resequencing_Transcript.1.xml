@@ -115,8 +115,11 @@ BLASR maps reads to genomes by finding the highest scoring local alignment or se
             <param name="align_opts" hidden="true">
                 <value>--minAccuracy=0.75 --minLength=50 --useQuality --multiple=all</value>
             </param>
+            <param name="loadPulsesOpts" hidden="true">
+                <value>-bymetric</value>
+            </param>
             <param name="pulseMetrics" hidden="true">
-                <value>DeletionQV,IPD,InsertionQV,PulseWidth,QualityValue,MergeQV,SubstitutionQV,DeletionTag -bymetrics</value>
+                <value>IPD</value>
             </param>
         </module>
         <module label="BLASR Reports v1" id="P_MappingReports" editableInJob="false"/>

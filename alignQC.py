@@ -420,7 +420,7 @@ def makeAlignmentPercentileDistribution(alnRatios, outfile, format, alnKey='IsFu
         fullPass = alnRatios[alnRatios[alnKey]&(((alnRatios['rEnd']-alnRatios['rStart'])*1./(alnRatios['iEnd']-alnRatios['iStart']))>=.8)]
     else:
         fullPass = alnRatios[alnRatios[alnKey]&(((alnRatios['rEnd']-alnRatios['rStart'])*1./(alnRatios['iEnd']-alnRatios['iStart']))>=.8)&(refLengthRange[0]<=alnRatios['RefLength'])&(alnRatios['RefLength']<=refLengthRange[1])]
-        
+          
     if len(fullPass) == 0:
         print >> sys.stderr, "Not drawing reference coverage for {0}!!".format(label)
         return
@@ -467,12 +467,19 @@ def makeAlignmentPercentileDistribution(alnRatios, outfile, format, alnKey='IsFu
                     startPercentile.append(1-e)
                     endPercentile.append(1-s)
                     
+    # round start/end percentiles
+    startPercentile = n.array(startPercentile)
+    startPercentile.round(decimals=1)
+    endPercentile = n.array(endPercentile)
+    endPercentile.round(decimals=1)
+                    
 
     max_y = 0
     for l, label, color in itertools.izip([startPercentile, endPercentile], ['Alignment Start', 'Alignment End'], ('#FF33CC', '#0000CC')):
-        num, bins, patches = ax1.hist(l, bins=101, histtype='stepfilled', label=label, normed=True, color=color)
+        num, bins, patches = ax1.hist(l, bins=n.arange(0,1.01,0.01), histtype='stepfilled', label=label, normed=True, color=color)
+        #print num, bins, patches
         max_y = max(max_y, n.max(num))
-
+    ax1.set_ylabel("Percentage (%)")
 
     acc = n.zeros(101)
     for a,b in itertools.izip(startPercentile,endPercentile): acc[int(a*100):int(b*100)+1] += 1
@@ -941,6 +948,8 @@ if __name__ == "__main__":
         makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", per_gene=True, refLengthRange=ref_size, refStrandDict=refStrandDict)
         #makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", "IsLongest", "Longest", per_gene=True, refLengthRange=ref_size, refStrandDict=refStrandDict)
         makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", "IsAT", SeenName, per_gene=True, refLengthRange=ref_size, refStrandDict=refStrandDict)
+        #pp.close()
+        #sys.exit(-1)
         makeCoverage_by_RefLength(alnRatios, pp, 'pdf')
         #makeCoverage_by_RefLength(alnRatios, pp, 'pdf', 'IsLongest', 'Longest')
         makeCoverage_by_RefLength(alnRatios, pp, 'pdf', 'IsAT', SeenName)        

@@ -1,4 +1,8 @@
-import os, sys
+#!/usr/bin/env python
+"""
+Sets up directories in smrtpipe/ according to runs/ directory
+"""
+import os, sys, subprocess
 
 for name in os.listdir('runs/'):
     d_run = os.path.join('runs', name)
@@ -14,5 +18,5 @@ for name in os.listdir('runs/'):
         print >> sys.stderr, "problem running", cmd
         continue
 
-    
+        
 
