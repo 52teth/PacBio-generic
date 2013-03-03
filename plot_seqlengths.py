@@ -4,18 +4,27 @@ import os, sys
 from Bio import SeqIO
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.interpolate import spline
 
-input = sys.argv[1]
-output = sys.argv[1] + '.seqlengths.png'
+inputs = sys.argv[1].split(",")
+output = sys.argv[2] + '.seqlengths.png'
+range_min = int(sys.argv[3])
+range_max = int(sys.argv[4])
 
-raw = [len(r.seq) for r in SeqIO.parse(open(input), 'fasta')]
-#raw = filter(lambda x: 0<x<3001, raw)
+raw = []
+for input in inputs:
+    raw += [len(r.seq) for r in SeqIO.parse(open(input), 'fasta')]
+raw = filter(lambda x: range_min<=x<=range_max, raw)
 
 seqlengths = np.array(raw)
 
-
 bins = (max(seqlengths)-min(seqlengths))/100 + 1
-plt.hist(seqlengths, bins=bins)
+y,binEdges = np.histogram(seqlengths, bins=bins)
+bincenters = 0.5*(binEdges[1:]+binEdges[:-1])
+
+xnew = np.linspace(bincenters.min(), bincenters.max(), 300)
+ysmooth = spline(bincenters, y, xnew)
+plt.plot(xnew, ysmooth, '-')
 plt.xlabel("Sequence Length")
 plt.ylabel("Count")
 plt.show()

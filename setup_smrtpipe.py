@@ -12,11 +12,10 @@ for name in os.listdir('runs/'):
     if not os.path.exists(d):
         print >> sys.stderr, "creating directory", d
         os.makedirs(d)
-
-    cmd = "find {0}/*/Analysis_Results/*.bas.h5 > {1}/input.fofn".format(os.path.abspath(d_run),d)
-    if os.system(cmd)!=0:
-        print >> sys.stderr, "problem running", cmd
-        continue
+        cmd = "find {0}/*/Analysis_Results/*.bas.h5 > {1}/input.fofn".format(os.path.abspath(d_run),d)
+        if os.system(cmd)!=0:
+            print >> sys.stderr, "problem running", cmd
+            continue
 
         
 

@@ -9,6 +9,7 @@ import argparse
 import cPickle
 import pdb
 import itertools
+import random
 
 from pbcore.io.BasH5IO import BasH5
 from pbcore.io.cmph5 import factory, alignmentPairMap
@@ -419,7 +420,7 @@ def makeAlignmentPercentileDistribution(alnRatios, outfile, format, alnKey='IsFu
     if refLengthRange is None:
         fullPass = alnRatios[alnRatios[alnKey]&(((alnRatios['rEnd']-alnRatios['rStart'])*1./(alnRatios['iEnd']-alnRatios['iStart']))>=.8)]
     else:
-        fullPass = alnRatios[alnRatios[alnKey]&(((alnRatios['rEnd']-alnRatios['rStart'])*1./(alnRatios['iEnd']-alnRatios['iStart']))>=.8)&(refLengthRange[0]<=alnRatios['RefLength'])&(alnRatios['RefLength']<=refLengthRange[1])]
+        fullPass = alnRatios[alnRatios[alnKey]&(((alnRatios['rEnd']-alnRatios['rStart'])*1./(alnRatios['iEnd']-alnRatios['iStart']))>=.8)&(refLengthRange[0]<=alnRatios['RefLength'])&(alnRatios['RefLength']<=refLengthRange[1])]        
           
     if len(fullPass) == 0:
         print >> sys.stderr, "Not drawing reference coverage for {0}!!".format(label)
@@ -878,6 +879,25 @@ def make_RefDict(cmpH5):
     """
     return cmpH5['/RefInfo'].asDict('ID', 'FullName')
 
+
+def restrict_insert_byPM(inserts, primer_match_dict):
+    new_ins = {}
+    for movie, v in inserts.iteritems():
+        arr = []
+        for x in v:
+            if (movie,str(x['HoleNumber'])) in primer_match_dict:
+                arr.append(x)
+        if len(arr) > 0:
+            new_ins[movie] = n.array(arr, dtype=[('HoleNumber', '<i4'), ('rStart', '<i4'), ('rEnd', '<i4'), ('IsFullPass', n.bool), ('IsHQTrimmed', n.bool), ('IsLongest', n.bool), ('IsAT', n.bool)])
+    return new_ins
+
+def restrict_aln_by_PM(alns, movie_dict, primer_match_dict):
+    new_alns = []
+    for x in alns:
+        if (movie_dict[x['MovieID']],str(x['HoleNumber'])) in primer_match_dict:
+            new_alns.append(x)
+    return n.array(new_alns, dtype=[('MovieID', '<i2'), ('RefID', '<i4'), ('HoleNumber', '<i4'),('rStart', '<i4'), ('rEnd', '<i4'),('tStart', '<i4'), ('tEnd', '<i4'),('iStart', '<i4'), ('iEnd', '<i4'), ('RefLength', '<i4'), ('IsFullPass', n.bool), ('IsHQTrimmed', n.bool), ('IsLongest', n.bool),('IsAT', n.bool), ('refStrand', '<i4')])
+
 if __name__ == "__main__":
     global SeenName
     SeenName = "5'-3'"
@@ -891,6 +911,7 @@ if __name__ == "__main__":
     parser.add_argument('--read_pickle')
     parser.add_argument("--ref_size", default=None)
     parser.add_argument("--refStrandPickle", default=None)
+    parser.add_argument("--restrictByPM", default=False,  action="store_true")
     args = parser.parse_args()
     
     ref_size = None
@@ -900,20 +921,44 @@ if __name__ == "__main__":
     inFOFN = os.path.join(args.job_directory, "input.fofn")
     cmph5FN = os.path.join(args.job_directory, "data", "aligned_reads.cmp.h5")
     filtered_subreadsFN = os.path.join(args.job_directory, "data", "filtered_subreads.fasta")
-    print "Creating cmph5 object"
-    cmpH5 = factory.create(cmph5FN)
-    print "Calculating reference lengths"
-    refLengths = getReferenceLengths(cmpH5)     
+#    print "Creating cmph5 object"
+#    cmpH5 = factory.create(cmph5FN)
+#    print "Calculating reference lengths"
+#    refLengths = getReferenceLengths(cmpH5)     
 
     if args.read_pickle:
-        stuff = cPickle.load(open(args.read_pickle, 'rb'))
-        if type(stuff) is dict:
-            inserts = stuff['inserts']
-            alnRatios = stuff['alns']
-            refDict = stuff['RefDict']
-        else:
-            inserts, alnRatios = stuff
+        primer_match_dict = getPrimerInfo(args.primer_match_file)
+        # could have multiple pickles, delimited by ,
+        pickles = args.read_pickle.split(',')
+        with open(pickles[0], 'rb') as h:
+            stuff = cPickle.load(h)
+        inserts = stuff['inserts']
+        alnRatios = stuff['alns']
+        refDict = stuff['RefDict']
+        if args.restrictByPM:
+            inserts = restrict_insert_byPM(inserts, primer_match_dict)
+            alnRatios = restrict_aln_by_PM(alnRatios, stuff['MovieDict'], primer_match_dict)
+        for pickle in pickles[1:]:
+            with open(pickle, 'rb') as h:
+                stuff = cPickle.load(h)
+            # assert that refDict must be the same!!!
+            stuff['RefDict'] == refDict
+            inserts2 = stuff['inserts']
+            alns2 = stuff['alns']
+            if args.restrictByPM:
+                inserts2 = restrict_insert_byPM(inserts2, primer_match_dict)
+                alns2 = restrict_aln_by_PM(alns2, stuff['MovieDict'], primer_match_dict)
+            inserts.update(inserts2)
+            alnRatios = n.concatenate((alnRatios, alns2))
+        refLengths = {}
+        for a in alnRatios:
+            refLengths[a['RefID']] = a['RefLength']
+        refLengths = n.array(refLengths.values())
     else:    
+        print "Creating cmph5 object"
+        cmpH5 = factory.create(cmph5FN)
+        print "Calculating reference lengths"
+        refLengths = getReferenceLengths(cmpH5)     
         print "Reading inserts from input.fofn"
         inserts = getInsertsFromFofn(inFOFN, args.primer_match_file, filtered_subreadsFN)
         print "Gathering alignment lengths"
@@ -943,11 +988,13 @@ if __name__ == "__main__":
         makeFractionSubreadHistogram(alnRatios, pp, "pdf")
         makeReferenceRLHistogram(alnRatios, refLengths, pp, "pdf", 0.99)
         makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", refStrandDict=refStrandDict)
+        makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", refLengthRange=ref_size, refStrandDict=refStrandDict)
         #makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", "IsLongest", "Longest", refLengthRange=ref_size, refStrandDict=refStrandDict)
         makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", "IsAT", SeenName, refLengthRange=ref_size, refStrandDict=refStrandDict)
         makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", per_gene=True, refLengthRange=ref_size, refStrandDict=refStrandDict)
         #makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", "IsLongest", "Longest", per_gene=True, refLengthRange=ref_size, refStrandDict=refStrandDict)
         makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", "IsAT", SeenName, per_gene=True, refLengthRange=ref_size, refStrandDict=refStrandDict)
+        
         #pp.close()
         #sys.exit(-1)
         makeCoverage_by_RefLength(alnRatios, pp, 'pdf')
