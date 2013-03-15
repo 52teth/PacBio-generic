@@ -8,13 +8,13 @@ from scipy.interpolate import spline
 
 inputs = sys.argv[1].split(",")
 output = sys.argv[2] + '.seqlengths.png'
-range_min = int(sys.argv[3])
-range_max = int(sys.argv[4])
+#range_min = int(sys.argv[3])
+#range_max = int(sys.argv[4])
 
 raw = []
 for input in inputs:
     raw += [len(r.seq) for r in SeqIO.parse(open(input), 'fasta')]
-raw = filter(lambda x: range_min<=x<=range_max, raw)
+#raw = filter(lambda x: range_min<=x<=range_max, raw)
 
 seqlengths = np.array(raw)
 
@@ -27,5 +27,6 @@ ysmooth = spline(bincenters, y, xnew)
 plt.plot(xnew, ysmooth, '-')
 plt.xlabel("Sequence Length")
 plt.ylabel("Count")
+plt.ylim((0, max(ysmooth)+100))
 plt.show()
 plt.savefig(output)
