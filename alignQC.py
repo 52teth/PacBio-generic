@@ -329,7 +329,7 @@ def makeSubreadRLHistogram(alnRatios, outfile, format, quantile=None, ylim=None)
         # smooth out the curve
         bins = (max(srLength)-min(srLength))/100 + 1
         y,binEdges = n.histogram(srLength, bins=bins)
-        bincenters = (binEdges[1:]+binEdges[:-1])
+        bincenters = 0.5*(binEdges[1:]+binEdges[:-1])
         xnew = n.linspace(bincenters.min(), bincenters.max(), 300)
         ysmooth = spline(bincenters, y, xnew)
         ax.plot(xnew, ysmooth, '-', label=label)
