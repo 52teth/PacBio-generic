@@ -2,9 +2,10 @@
 import os, sys, fnmatch, shutil
 
 
-for d0 in os.listdir('.'):
-    if not os.path.isdir(d0): continue
-    for d1 in os.listdir(d0):
+#for d0 in os.listdir('.'):
+#    if not os.path.isdir(d0): continue
+d0='.'
+for d1 in os.listdir(d0):
         if d1.startswith('primer_match'):
             for d2 in os.listdir(os.path.join(d0,d1)):
                 x2 = os.path.join(d0,d1,d2)

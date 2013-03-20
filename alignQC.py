@@ -875,8 +875,20 @@ def write_summary_page(pdf_filename, args, inserts, alnRatios):
     <br/>
     """.format(seq_ZMWs, seq_ZMWs*100./(num_of_bash5*75000), total), styles['Normal']))
     
+    def func_qCov80(alnRatios, alnKey, divide_by, unique):
+        if alnKey is None:
+            x = alnRatios[(((alnRatios['rEnd']-alnRatios['rStart'])*1./(alnRatios['iEnd']-alnRatios['iStart']))>=.8)]
+        else:
+            x = alnRatios[alnRatios[alnKey]&(((alnRatios['rEnd']-alnRatios['rStart'])*1./(alnRatios['iEnd']-alnRatios['iStart']))>=.8)]
+        if unique:
+            a = len(set(x['RefID']))
+        else:
+            a = len(x)
+        b = divide_by
+        return "{0} ({1:.0f}%)".format(a, a*100./b)
+
     func = lambda a, b: "{0} ({1:.0f}%)".format(a, a*100./b)
-    
+
     data = []
     data.append(["Type", "Per Total Subreads", "Per ZMW",])
     data.append(["FullPass", func(total_fullpass,total), func(zmw_fullpass,seq_ZMWs)])
@@ -895,14 +907,14 @@ def write_summary_page(pdf_filename, args, inserts, alnRatios):
     P(full-pass | is 5'-3') = {1:.2f}
     <br/>
     <br/>
-    Subread alignment summary:
+    Subread alignment summary (qCov>=80%):
     """.format(is_AT_if_FP*1./total_fullpass, is_FP_if_AT*1./total_AT), styles['Normal']))  
     
     data = []
     data.append(["Subread Type", "Original", "Aligned", "Unique RefIDs aligned to"])
-    data.append(["Total", total, func(len(alnRatios),total), len(set(alnRatios[:]['RefID']))])
-    data.append(["FullPass", total_fullpass, func(len(alnRatios[alnRatios['IsFullPass']]),total_fullpass), len(set(alnRatios[alnRatios['IsFullPass']]['RefID']))])
-    data.append([SeenName, total_AT, func(len(alnRatios[alnRatios['IsAT']]),total_AT), len(set(alnRatios[alnRatios['IsAT']]['RefID']))])
+    data.append(["Total", total, func_qCov80(alnRatios,None,total,False), func_qCov80(alnRatios,None,total,True)])
+    data.append(["FullPass", total_fullpass, func_qCov80(alnRatios,'IsFullPass',total_fullpass,False), func_qCov80(alnRatios,'IsFullPass',total_fullpass,True)])
+    data.append([SeenName, total_AT, func_qCov80(alnRatios,'IsAT',total_AT,False), func_qCov80(alnRatios,'IsAT',total_AT,True)])
              
     t=Table(data)
     t.setStyle(TableStyle([('BACKGROUND', (0,0), (0,-1), colors.gray),
