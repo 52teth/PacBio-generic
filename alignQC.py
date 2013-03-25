@@ -33,6 +33,9 @@ def getMaxCoveredRefMatch(alns, refLengthDict):
     """
     return max(alns, key=lambda x: (x['tEnd']-x['tStart'])*1./refLengthDict[x['RefGroupID']])
 
+def getMaxSubreadCoverage(alns):
+    return max(alns, key=lambda x: x['rEnd']-x['rStart'])
+
 def group_by_inserts(alns, inss):
     """
     alns is a slice of /AlnInfo
@@ -254,6 +257,7 @@ def getAlignedLengthRatios(cmph5, inserts):
                     if len(aln_indices) == 0:
                         continue
                     i = inss[ins_index]
+                    #a = getMaxSubreadCoverage(alns[aln_indices])
                     a = getMaxCoveredRefMatch(alns[aln_indices], refLengthDict)
                    # pdb.set_trace()
                     rStart = a['rStart']
@@ -875,11 +879,11 @@ def write_summary_page(pdf_filename, args, inserts, alnRatios):
     <br/>
     """.format(seq_ZMWs, seq_ZMWs*100./(num_of_bash5*75000), total), styles['Normal']))
     
-    def func_qCov80(alnRatios, alnKey, divide_by, unique):
+    def func_qCov10(alnRatios, alnKey, divide_by, unique):
         if alnKey is None:
-            x = alnRatios[(((alnRatios['rEnd']-alnRatios['rStart'])*1./(alnRatios['iEnd']-alnRatios['iStart']))>=.8)]
+            x = alnRatios[(((alnRatios['rEnd']-alnRatios['rStart']*1.)/(alnRatios['iEnd']-alnRatios['iStart']))>=.1)]
         else:
-            x = alnRatios[alnRatios[alnKey]&(((alnRatios['rEnd']-alnRatios['rStart'])*1./(alnRatios['iEnd']-alnRatios['iStart']))>=.8)]
+            x = alnRatios[alnRatios[alnKey]&(((alnRatios['rEnd']-alnRatios['rStart']*1.)/(alnRatios['iEnd']-alnRatios['iStart']))>=.1)]
         if unique:
             a = len(set(x['RefID']))
         else:
@@ -907,14 +911,16 @@ def write_summary_page(pdf_filename, args, inserts, alnRatios):
     P(full-pass | is 5'-3') = {1:.2f}
     <br/>
     <br/>
-    Subread alignment summary (qCov>=80%):
+    Subread alignment summary (qCov>=10%):
     """.format(is_AT_if_FP*1./total_fullpass, is_FP_if_AT*1./total_AT), styles['Normal']))  
     
+    total_ref = len(set(alnRatios['RefID']))
+
     data = []
     data.append(["Subread Type", "Original", "Aligned", "Unique RefIDs aligned to"])
-    data.append(["Total", total, func_qCov80(alnRatios,None,total,False), func_qCov80(alnRatios,None,total,True)])
-    data.append(["FullPass", total_fullpass, func_qCov80(alnRatios,'IsFullPass',total_fullpass,False), func_qCov80(alnRatios,'IsFullPass',total_fullpass,True)])
-    data.append([SeenName, total_AT, func_qCov80(alnRatios,'IsAT',total_AT,False), func_qCov80(alnRatios,'IsAT',total_AT,True)])
+    data.append(["Total", total, func_qCov10(alnRatios,None,total,False), func_qCov10(alnRatios,None,total_ref,True)])
+    data.append(["FullPass", total_fullpass, func_qCov10(alnRatios,'IsFullPass',total_fullpass,False), func_qCov10(alnRatios,'IsFullPass',total_ref,True)])
+    data.append([SeenName, total_AT, func_qCov10(alnRatios,'IsAT',total_AT,False), func_qCov10(alnRatios,'IsAT',total_ref,True)])
              
     t=Table(data)
     t.setStyle(TableStyle([('BACKGROUND', (0,0), (0,-1), colors.gray),
