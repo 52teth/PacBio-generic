@@ -109,14 +109,13 @@ def getInsertsFromBasH5(bash5FN, func_53seen, func_is_in_filtered):
     NOTE: IsFullLength is actually set according to 5seen & 3seen. Check function definition!!
     """
     bash5 = BasH5Reader(bash5FN)
-    rgnTable = bash5.regionTable
     data = []
     
     for hn in bash5.sequencingZmws:
         adapter_positions = []
         inserts = []
         hqStart, hqEnd = None, None
-        for x in rgnTable[rgnTable['holeNumber']==hn]:
+        for x in bash5[hn].regionTable:
             if x['regionType'] == 0: # adapter
                 adapter_positions.append(x['regionStart'])
                 adapter_positions.append(x['regionEnd'])
@@ -129,7 +128,7 @@ def getInsertsFromBasH5(bash5FN, func_53seen, func_is_in_filtered):
         if hqStart == hqEnd: # HQ region is blank, nothing to do
             continue
         
-        subread_ses = [(x.readStart, x.readEnd) for x in bash5[hn].subreads()]
+        subread_ses = [(x.readStart, x.readEnd) for x in bash5[hn].subreads]
         
         for s, e in inserts:
             if e <= hqStart or s >= hqEnd: # beyond HQ region, ignore
@@ -186,9 +185,16 @@ def getInsertsFromFofn(inputFOFN, primer_match_filename, filtered_subreads_fasta
         for line in f:
             filename = line.strip()
             print >> sys.stderr, "Reading", filename
-            movieName = sub('.pls.h5|.bas.h5', '', os.path.basename(filename))
-            inserts[movieName] = getInsertsFromBasH5(filename, functools.partial(hasPolyAT, primer_match_dict, movieName),\
-                                                     functools.partial(func_is_in_filtered, movieName))
+            b = os.path.basename(filename)
+            if b.endswith('.pls.h5') or b.endswith('.bas.h5'): movieName = b[:-7]
+            elif b.endswith('.bax.h5'): 
+                b = b[:-7]
+                movieName = b[:b.rfind('.')]
+            data = getInsertsFromBasH5(filename, functools.partial(hasPolyAT, primer_match_dict, movieName), functools.partial(func_is_in_filtered, movieName))
+            if movieName in inserts: # for .bax.h5 case
+                inserts[movieName] = n.append(inserts[movieName], data)
+            else:
+                inserts[movieName] = data
 
     return inserts
 
@@ -270,6 +276,7 @@ def makeFractionSubreadHistogram(alnRatios, outfile, format):
     fullPass = alnRatios[alnRatios['IsFullPass']]
     fullLength = alnRatios[alnRatios['IsFullLength']]
 
+    max_y = 0
     for l, label in zip((alnRatios, fullPass, fullLength), ("Aligned Subreads", "Aligned full-pass subreads", "Aligned " + SeenName + " subreads")):
         data = l['rCov']
         # smooth out the curve
@@ -278,9 +285,11 @@ def makeFractionSubreadHistogram(alnRatios, outfile, format):
         bincenters = 0.5*(binEdges[1:]+binEdges[:-1])
         xnew = n.linspace(bincenters.min(), bincenters.max(), 300)
         ysmooth = spline(bincenters, y, xnew)
+        max_y = max(max_y, max(ysmooth))
         ax.plot(xnew, ysmooth, '-', label=label)
         #ax.hist(alnSubRatio, bins=50, histtype='step', label=label)
 
+    ax.set_ylim(0, max_y * 1.1)
     ax.legend(loc='upper left')
     ax.set_xlabel("Subread aligned length/Subread length ratio")
     ax.set_ylabel("Count")
@@ -698,7 +707,7 @@ def _fn(dir, pref, plot_type, suf):
     return os.path.join(dir, pref + "_" + plot_type + suf)
 
  
-def write_summary_page(pdf_filename, args, inserts, alnRatios, zmw_per_chip=75000):
+def write_summary_page(pdf_filename, args, inserts, alnRatios, zmw_per_chip):
     """
     Summary page should contain:
     
@@ -855,6 +864,7 @@ if __name__ == "__main__":
     parser.add_argument('-d', '--output_directory', required=True)
     parser.add_argument("-m", '--primer_match_file', required=True)
     parser.add_argument('-p', '--output_prefix', required=True)
+    parser.add_argument("--zmw_per_chip", default=75000, help="Number of ZMWs per chip (def: 75000)")
     parser.add_argument('--read_pickle')
     parser.add_argument("--ref_size", default=None)
     parser.add_argument("--restrictByPM", default=False,  action="store_true", help=argparse.SUPPRESS) # ToDo: validate this before opening up the option
@@ -925,7 +935,7 @@ if __name__ == "__main__":
         with open(os.path.join(args.output_directory, args.output_prefix + ".pkl"), 'wb') as f:
             cPickle.dump({'inserts':inserts, 'alns':alnRatios, 'MovieDict':movieDict, 'RefDict':refDict, 'refLengths': refLengths}, f)
 
-    write_summary_page(os.path.join(args.output_directory, args.output_prefix + '.summary.pdf'), args, inserts, alnRatios)
+    write_summary_page(os.path.join(args.output_directory, args.output_prefix + '.summary.pdf'), args, inserts, alnRatios, args.zmw_per_chip)
 
     pp = PdfPages(os.path.join(args.output_directory, args.output_prefix + ".figures.pdf"))
     print  >> sys.stderr, "Creating pdf plots"
