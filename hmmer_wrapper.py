@@ -247,7 +247,7 @@ def worker(out_filename_hmmer, p_filename, in_filename, matrix_filename):
     print >> sys.stderr, "CMD:", cmd
     subprocess.check_call(cmd, shell=True)
 
-def main(output_dir, primer_filename, fasta_filename, output_filename, k, cpus, see_left, see_right, min_seqlen, min_score, output_anyway, change_seqid):
+def hmmer_wrapper_main(output_dir, primer_filename, fasta_filename, output_filename, k=100, cpus=8, see_left=True, see_right=True, min_seqlen=50, min_score=10, output_anyway=False, change_seqid=False):
     # find the matrix file PBMATRIX.txt
     matrix_filename = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'PBMATRIX.txt')
     if not os.path.exists(matrix_filename):
@@ -341,7 +341,7 @@ if __name__ == "__main__":
     group2.add_argument("-o", "--output_filename", required=True, help="Output fasta filename")
 
     args = parser.parse_args()
-    main(args.directory, args.primer_filename, args.input_filename, args.output_filename, args.primer_search_window, args.cpus,\
+    hmmer_wrapper_main(args.directory, args.primer_filename, args.input_filename, args.output_filename, args.primer_search_window, args.cpus,\
         not args.left_nosee_ok, not args.right_nosee_ok, args.min_seqlen, args.min_score, args.output_anyway, args.change_seqid)
 
 
