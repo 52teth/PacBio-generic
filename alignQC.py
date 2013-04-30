@@ -864,7 +864,7 @@ if __name__ == "__main__":
     parser.add_argument('-d', '--output_directory', required=True)
     parser.add_argument("-m", '--primer_match_file', required=True)
     parser.add_argument('-p', '--output_prefix', required=True)
-    parser.add_argument("--zmw_per_chip", default=75000, help="Number of ZMWs per chip (def: 75000)")
+    parser.add_argument("--zmw_per_chip", default=75000, type=int, help="Number of ZMWs per chip (def: 75000)")
     parser.add_argument('--read_pickle')
     parser.add_argument("--ref_size", default=None)
     parser.add_argument("--restrictByPM", default=False,  action="store_true", help=argparse.SUPPRESS) # ToDo: validate this before opening up the option

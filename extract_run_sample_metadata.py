@@ -19,7 +19,8 @@ def get_cell_info(xml_filename):
     wellname = dom.getElementsByTagName('WellName')[0].firstChild.nodeValue
     collection = dom.getElementsByTagName('CollectionNumber')[0].firstChild.nodeValue
     samplename = dom.getElementsByTagName('Sample')[0].getElementsByTagName('Name')[0].firstChild.nodeValue
-    return wellname, collection, samplename
+    comments = dom.getElementsByTagName('Comments')[0].firstChild.nodeValue
+    return wellname, collection, samplename, comments
 
 def main():
     for dirname in os.listdir('runs/'):
