@@ -8,6 +8,8 @@ import cPickle
 import pdb
 import itertools
 
+from Bio import SeqIO
+
 from pbcore.io import BasH5Reader, CmpH5Reader
 
 import matplotlib.cm as cm
@@ -21,6 +23,11 @@ from scipy.interpolate import spline
 from csv import DictReader
 from collections import defaultdict
 from bx.intervals.intersection import IntervalTree
+
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
 
 def getMaxCoveredRefMatch(alns, refLengthDict):
     """
@@ -170,7 +177,6 @@ def getInsertsFromFofn(inputFOFN, primer_match_filename, filtered_subreads_fasta
     Returns: dict of movieName --> array from reading .bas.h5
     """
     import functools 
-    from Bio import SeqIO
     primer_match_dict = getPrimerInfo(primer_match_filename)
     inserts = {}
     
@@ -716,11 +722,6 @@ def write_summary_page(pdf_filename, args, inserts, alnRatios, zmw_per_chip):
     3. # and % of 5'-3' per total, ZMW
     
     """
-    from reportlab.lib import colors
-    from reportlab.lib.pagesizes import letter
-    from reportlab.lib.styles import getSampleStyleSheet
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
-    
     doc = SimpleDocTemplate(pdf_filename, pagesize=letter)
     # container for the 'Flowable' objects
     styles = getSampleStyleSheet()
@@ -883,19 +884,23 @@ if __name__ == "__main__":
     cmph5FN = os.path.join(args.job_directory, "data", "aligned_reads.cmp.h5")
     filtered_subreadsFN = os.path.join(args.job_directory, "data", "filtered_subreads.fasta")
     
-    if not os.path.exists(inFOFN):
-        print >> sys.stderr, "Expecting file {0} but not found. Abort.".format(inFOFN)
-        sys.exit(-1)
-    if not os.path.exists(cmph5FN):
-        print >> sys.stderr, "Expecting file {0} but not found. Abort.".format(cmph5FN)
-        sys.exit(-1)
-    if not os.path.exists(filtered_subreadsFN):
-        print >> sys.stderr, "Expecting file {0} but not found. Abort.".format(filtered_subreadsFN)
-        sys.exit(-1)        
+    if not args.read_pickle:
+        if not os.path.exists(inFOFN):
+            print >> sys.stderr, "Expecting file {0} but not found. Abort.".format(inFOFN)
+            sys.exit(-1)
+        if not os.path.exists(cmph5FN):
+            print >> sys.stderr, "Expecting file {0} but not found. Abort.".format(cmph5FN)
+            sys.exit(-1)
+        if not os.path.exists(filtered_subreadsFN):
+            print >> sys.stderr, "Expecting file {0} but not found. Abort.".format(filtered_subreadsFN)
+            sys.exit(-1)        
 
 
     if args.read_pickle:
-        primer_match_dict = getPrimerInfo(args.primer_match_file)
+        primer_match_files = args.primer_match_file.split(',')
+        primer_match_dict = getPrimerInfo(primer_match_files[0])
+        for file in primer_match_files[1:]:
+            primer_match_dict.update(getPrimerInfo(file))
         # could have multiple pickles, delimited by ,
         pickles = args.read_pickle.split(',')
         with open(pickles[0], 'rb') as h:
@@ -912,7 +917,10 @@ if __name__ == "__main__":
             with open(pickle, 'rb') as h:
                 stuff = cPickle.load(h)
             # assert that refDict must be the same!!!
-            assert stuff['RefDict'] == refDict
+            for k in stuff['RefDict']:
+                assert k not in refDict or stuff['RefDict'][k]==refDict[k]
+            for k in refDict:
+                assert k not in stuff['RefDict'] or stuff['RefDict'][k]==refDict[k]
             inserts2 = stuff['inserts']
             alns2 = stuff['alns']
             if args.restrictByPM:
@@ -945,11 +953,13 @@ if __name__ == "__main__":
     #makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", refStrandDict=refStrandDict)
     makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", refLengthRange=ref_size,)
     makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", "IsFullLength", SeenName, refLengthRange=ref_size)
+    makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", "IsFullLength", SeenName, refLengthRange=ref_size, qcov_threshold=0.)
     makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", per_gene=True, refLengthRange=ref_size)
     makeAlignmentPercentileDistribution(alnRatios, pp, "pdf", "IsFullLength", SeenName, per_gene=True, refLengthRange=ref_size)
     #makeStartPositionVS(alnRatios, pp, 'pdf')
     #makeEndPositionVS(alnRatios, pp, 'pdf', 'IsAT', SeenName, refStrandDict=refStrandDict, refLengthRange=ref_size)
     makeRefLengthVSAbundance(alnRatios, pp, 'pdf', 'IsFullLength', SeenName)
+    makeRefLengthVSAbundance(alnRatios, pp, 'pdf', 'IsFullLength', SeenName, covThreshold=0.0)
     makeSubreadLengthVsReferenceLengthHexbinHist(alnRatios, pp, "pdf")
     makeSubreadLengthVsReferenceLengthHexbinHist(alnRatios, pp, "pdf", "IsFullLength", SeenName)
     makeFractionReferencevsFractionSubreadHexbinHist(alnRatios, pp, "pdf", refLengthRange=ref_size)

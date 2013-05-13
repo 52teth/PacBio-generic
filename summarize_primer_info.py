@@ -25,7 +25,7 @@ with open(input) as f:
     for r in DictReader(f, delimiter='\t'):
         see5 = r['5seen']=='1'
         see3 = r['3seen']=='1'
-        if r['primer'] is not None:
+        if r['primer'] is not None and r['primer']!='NA':
             pm_count[r['primer']] += 1
         if r['ID'].count('/') == 1:
             isCCS = True

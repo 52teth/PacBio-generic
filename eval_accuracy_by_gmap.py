@@ -1,0 +1,119 @@
+import os, sys, random, subprocess
+from collections import defaultdict
+import numpy as np
+from Bio import SeqIO
+from pbcore.io import BasH5Reader
+import GFF
+"""
+Randomly select subreads (or CCS reads) from a .bas.h5 file, run GMAP, then use GMAP's mapping identity to evaluate
+expected accuracy (QVs) and observed accuracy (alignment identity)
+"""
+
+def select_random_sequences(bas_filename, out_fa, out_fq, random_prob, num_of_seqs, use_CCS=False):
+    """
+    random_prob --- prob between (0, 1] to use for selecting sequences
+    num_of_seqs --- selection stops either by end of .bas.h5 or reaches this limit
+    use_CCS --- if True, selects CCS; other selects subreads
+    """
+    bas = BasH5Reader(bas_filename)
+    count = 0
+    for zmw_number in bas.sequencingZmws:
+        zmw = bas[zmw_number]
+        if use_CCS:
+            if zmw.ccsRead is not None and random.random() <= random_prob:
+                s = zmw.ccsRead
+                count += 1
+                out_fa.write(">{0}\n{1}\n".format(s.readName, s.basecalls()))
+                out_fq.write("@{0}\n{1}\n+\n{2}\n".format(s.readName, s.basecalls(),  "".join(chr(x+33) for x in s.QualityValue())))
+        else:
+            for subread in zmw.subreads:
+                if random.random() <= random_prob:
+                    s = subread
+                    count += 1
+                    out_fa.write(">{0}\n{1}\n".format(s.readName, s.basecalls()))
+                    out_fq.write("@{0}\n{1}\n+\n{2}\n".format(s.readName, s.basecalls(),  "".join(chr(x+33) for x in s.QualityValue())))
+        if count >= num_of_seqs:
+            return count
+    return count
+            
+def run_gmap(fa_filename, fq_filename, tempdir='/scratch'):
+    """
+    Run gmap on FASTA file, extracting the alignment identity and comparing it with FASTQ QVs
+    """
+    out_filename = os.tempnam(tempdir)
+    #cmd_f = open(out_filename + '.sh', 'w')
+    #cmd_f.write("#!/bin/bash\n")
+    #cmd_f.write("gmap -D /home/UNIXHOME/etseng/share/gmap_db -d hg19 -t 12 -f gff3_gene -n 0 {i} > {o}\n".format(i=fa_filename, o=out_filename))
+    #cmd_f.close()
+    #cmd = "qsub -sync y -pe smp 12 -cwd -S /bin/bash -e /dev/null -o /dev/null " + cmd_f.name
+    #print >> sys.stderr, "CMD:", cmd 
+    
+    cmd = "gmap -D /home/UNIXHOME/etseng/share/gmap_db -d hg19 -t 12 -f gff3_gene -n 0 {i} > {o}\n".format(i=fa_filename, o=out_filename)
+    if subprocess.check_call(cmd, shell=True) !=0 :
+        print >> sys.stderr, "Error running: {0}. Abort.".format(cmd)
+        
+    tally = defaultdict(lambda: []) # seqid --> gmapRecord
+    for r in GFF.gmapGFFReader(out_filename):
+        tally[r.seqid].append(r)
+    
+    obs2exp = [] # (exp. avg. accuracy, obs. avg. accuracy, size)
+    unmapped = 0 # count of not aligned by GMAP
+    for r in SeqIO.parse(open(fq_filename), 'fastq'):
+        if r.id not in tally:
+            unmapped += 1
+        else:
+            for gmap_rec in tally[r.id]:
+                for score, seq_exon in zip(gmap_rec.scores, gmap_rec.seq_exons):
+                    obs_acc = np.mean([1-10**-(x/10.) for x in r.letter_annotations['phred_quality'][seq_exon.start:seq_exon.end]])
+                    obs2exp.append((obs_acc*100., score, seq_exon.end-seq_exon.start))
+
+    obs2exp = np.array(obs2exp, dtype=[('ObsAccuracy', '>f4'), ('ExpAccuracy', '>f4'), ('Size', '>i4')])
+    os.remove(out_filename)                   
+    return unmapped, obs2exp
+        
+    
+def main(fofn_filename, prefix, random_prob=0.01, num_of_seqs=1000, use_CCS=False):
+    
+    out_fa = open(prefix+'.fa', 'w')
+    out_fq = open(prefix+'.fq', 'w')
+    count = 0
+    with open(fofn_filename) as f:
+        for line in f:
+            print >> sys.stderr, "selecting random sequences from {0}....".format(line.strip())
+            count += select_random_sequences(line.strip(), out_fa, out_fq, random_prob, num_of_seqs, use_CCS)
+    out_fa.close()
+    out_fq.close()
+    
+    if count == 0:
+        print >> sys.stderr, "Retrieved 0 sequences! :( Abort."
+        return None, None
+    
+    
+    print >> sys.stderr, "running gmap on {0}".format(out_fa.name)
+    unmapped, obs2exp = run_gmap(out_fa.name, out_fq.name)
+    
+    avg_exp = obs2exp['ExpAccuracy'].mean()
+    avg_obs = obs2exp['ObsAccuracy'].mean()
+    
+    print "Total number of sequences:", count
+    print "Total number of unmapped: {0} ({1:.1f}%)".format(unmapped, unmapped*100./count)
+    print "Avg. expected accuracy: {0:.1f}%".format(avg_exp)
+    print "Avg. observed accuracy: {0:.1f}%".format(avg_obs)
+    
+    np.savetxt(prefix+'.obs2exp.txt', obs2exp)
+    
+    return unmapped, obs2exp
+                    
+        
+if __name__ == "__main__":
+    from argparse import ArgumentParser
+    parser = ArgumentParser("Randomly select subreads/CCS reads, run GMAP, plot exp vs obs accuracy")
+    parser.add_argument("-i", "--input_fofn", default="input.fofn", help="input fofn")
+    parser.add_argument("-p", "--prefix", required=True, help="Output FASTA/FASTQ prefix")
+    parser.add_argument("-r", "--random_prob", type=float, default=.01, help="Random selection prob (default: 0.01)")
+    parser.add_argument("-n", "--max_seq_per_bash5", type=int, default=1000, help="Max # of seqs per .bas.h5 or .bax.h5 (default: 1000)")
+    parser.add_argument("--use_CCS", action='store_true', default=False, help="Use CCS instead of subreads")
+
+
+    args = parser.parse_args()
+    main(args.input_fofn, args.prefix, args.random_prob, args.max_seq_per_bash5, args.use_CCS)
