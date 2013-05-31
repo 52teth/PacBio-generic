@@ -736,14 +736,14 @@ def write_summary_page(pdf_filename, args, inserts, alnRatios, zmw_per_chip):
     """.format(os.path.abspath(args.job_directory)), styles['Normal'])
     elements.append(input)
     
-    num_of_bash5 = 0
+    bash5_names = set()
     inFOFN = os.path.join(args.job_directory, "input.fofn")
     for file in open(inFOFN):
-        num_of_bash5 += 1
+        name = os.path.basename(file)        
+        bash5_names.add(name[:name.find('.')]) # add just the <name>, skipping the .1.bax.h5 or .bas.h5 suffix
         elements.append(Paragraph(os.path.basename(file), styles['Normal']))
-                    
-    
-    
+                        
+    num_of_bash5 = len(bash5_names)
     total  = 0
     full_pass = defaultdict(lambda: 0) # (movie,hole) --> count
     full_length = defaultdict(lambda: 0)
@@ -865,7 +865,7 @@ if __name__ == "__main__":
     parser.add_argument('-d', '--output_directory', required=True)
     parser.add_argument("-m", '--primer_match_file', required=True)
     parser.add_argument('-p', '--output_prefix', required=True)
-    parser.add_argument("--zmw_per_chip", default=75000, type=int, help="Number of ZMWs per chip (def: 75000)")
+    parser.add_argument("--zmw_per_chip", default=150000, type=int, help="Number of ZMWs per chip (def: 75000)")
     parser.add_argument('--read_pickle')
     parser.add_argument("--ref_size", default=None)
     parser.add_argument("--restrictByPM", default=False,  action="store_true", help=argparse.SUPPRESS) # ToDo: validate this before opening up the option

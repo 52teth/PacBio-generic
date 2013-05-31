@@ -9,7 +9,7 @@ Then it does everything needed for primer_match/
 (2) run summarize_primer_info.py
 """
 
-barcode_trimmer_option = "--cpus 16" # none means 5'-3'
+barcode_trimmer_option = "--cpus 24" # none means 5'-3'
 barcode_trimmer_prefix = "53seen_trimmed" # should correspond to the option above
 
 for name in os.listdir('runs/'):

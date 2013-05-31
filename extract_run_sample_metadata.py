@@ -19,7 +19,7 @@ def get_cell_info(xml_filename):
     wellname = dom.getElementsByTagName('WellName')[0].firstChild.nodeValue
     collection = dom.getElementsByTagName('CollectionNumber')[0].firstChild.nodeValue
     samplename = dom.getElementsByTagName('Sample')[0].getElementsByTagName('Name')[0].firstChild.nodeValue
-    comments = dom.getElementsByTagName('Comments')[0].firstChild.nodeValue
+    comments = dom.getElementsByTagName('Name')[0].firstChild.nodeValue
     return wellname, collection, samplename, comments
 
 def main():
@@ -31,9 +31,11 @@ def main():
         rnames = os.listdir(os.path.join('runs/', dirname))
         rnames.sort()
         for runname in rnames:
-            xml =  os.path.join('runs/', dirname, runname, fnmatch.filter(os.listdir(os.path.join('runs/', dirname, runname)), '*.metadata.xml')[0])
-            print runname+":",os.path.basename(xml)[:-19],"-".join(get_cell_info(xml))
-            
+            try:
+                xml =  os.path.join('runs/', dirname, runname, fnmatch.filter(os.listdir(os.path.join('runs/', dirname, runname)), '*.metadata.xml')[0])
+                print runname+":",os.path.basename(xml)[:-19],"-".join(get_cell_info(xml))
+            except: 
+                print "UNABLE to process"
         
 if __name__ == "__main__":
     main()
