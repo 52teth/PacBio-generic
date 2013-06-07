@@ -93,7 +93,33 @@ def run_gmap(fa_filename, fq_filename=None, gmap_filename=None, tempdir='/scratc
     chimera_rate = len(filter(lambda x: len(tally[x])>1, tally))*1./len(tally)
     avg_coverage = sum(k*v for k,v in coverages.iteritems())*1./sum(coverages.itervalues())
     return unmapped, obs2exp, chimera_rate, avg_coverage, len(zmw_seen)
+
+
+def split_gmap_outcome(fa_filename, gmap_filename):
+    """
+    Split into:
+    .gmap_unmapped.fa
+    .gmap_chimera.fa
+    .gmap_non_chimera.fa
+    """
+    f_un = open(fa_filename + '.gmap_unmapped.fa', 'w')    
+    f_is = open(fa_filename + '.gmap_chimera.fa', 'w')
+    f_non = open(fa_filename + '.gmap_non_chimera.fa', 'w')
+    
+    d = defaultdict(lambda: 0)
+    for r in GFF.gmapGFFReader(gmap_filename):
+        d[r.seqid] += 1
         
+    for r in SeqIO.parse(open(fa_filename), 'fasta'):
+        if r.id not in d: f_un.write(">{0}\n{1}\n".format(r.id, r.seq))
+        elif d[r.id] == 1: f_non.write(">{0}\n{1}\n".format(r.id, r.seq))
+        else: f_is.write(">{0}\n{1}\n".format(r.id, r.seq))
+    
+    
+    f_un.close()
+    f_is.close()
+    f_non.close()        
+    
     
 def main(fofn_filename, prefix, random_prob=0.01, num_of_seqs=1000, use_CCS=False, min_seq_len=500):
     out_fa = open(prefix+'.fa', 'w')

@@ -42,6 +42,7 @@ for name in os.listdir('runs/'):
         print >> sys.stderr, "Trouble linking {0}. Skipping {1}".format(fa_ccs1, name)
         continue
 
+    continue
     out_all = os.path.join(pm_d, 'output')
     out_ccs = os.path.join(pm_d, 'outputCCS')
     pf = os.path.join(pm_d, 'primers.fa')
