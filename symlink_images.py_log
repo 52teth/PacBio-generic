@@ -1,0 +1,11 @@
+# IPython log file
+
+import os, sys
+import fnmatch
+dirs = fnmatch.filter(os.listdir('../'), 'July*')
+for d in dirs:
+    d1 = os.path.join('../', d)
+    for file in fnmatch.filter(os.listdir(d1), '*.png'):
+        file1 = os.path.join(os.path.join(d1, file))
+        os.system("ln -s {0} {1}.{2}".format(file1, d, os.path.basename(file)))
+        

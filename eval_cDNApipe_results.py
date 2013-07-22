@@ -70,8 +70,8 @@ def summarize_chimera(ccs_prefix='ccs_reads.53Aseen_trimmed_changeid.fa', nonccs
     print("% of artificial chimeras: {0}/{1} ({2:.1f}%)").format(a, b, a*100./b)
     
 def summarize_gmap(ccs_prefix='ccs_reads.53Aseen_trimmed_changeid.fa.non_chimera.fa', nonccs_prefix='nonccs_subreads.53Aseen_trimmed_changeid.fa.non_chimera.fa'):    
-    ccs_unmapped, ccs_obs2exp, ccs_chimera_rate, ccs_avg_coverage, ccs_zmw_count = eval_accuracy_by_gmap.run_gmap(ccs_prefix, None, ccs_prefix+'.gff')
-    nonccs_unmapped, nonccs_obs2exp, nonccs_chimera_rate, nonccs_avg_coverage, nonccs_zmw_count = eval_accuracy_by_gmap.run_gmap(nonccs_prefix, None, nonccs_prefix+'.gff')
+    ccs_unmapped, ccs_obs2exp, (ccs_chimera_missed,ccs_chimera_real,ccs_chimera_rate), ccs_avg_coverage, ccs_zmw_count = eval_accuracy_by_gmap.run_gmap(ccs_prefix, None, ccs_prefix+'.gff')
+    nonccs_unmapped, nonccs_obs2exp, (nonccs_chimera_missed,nonccs_chimera_real,nonccs_chimera_rate), nonccs_avg_coverage, nonccs_zmw_count = eval_accuracy_by_gmap.run_gmap(nonccs_prefix, None, nonccs_prefix+'.gff')
         
     ccs_avg_obs = ccs_obs2exp['ObsAccuracy'].mean()
     nonccs_avg_obs = nonccs_obs2exp['ObsAccuracy'].mean()
@@ -81,13 +81,15 @@ def summarize_gmap(ccs_prefix='ccs_reads.53Aseen_trimmed_changeid.fa.non_chimera
     print "Total number of unmapped: {0} ({1:.1f}%)".format(ccs_unmapped, ccs_unmapped*100./ccs_zmw_count)
     print "Avg. coverage: {0:.1f}%".format(ccs_avg_coverage)
     print "Avg. observed accuracy: {0:.1f}%".format(ccs_avg_obs)
-    print "Chimera rate: {0:.1f}%".format(ccs_chimera_rate*100.)   
+    print "Chimera rate: {0:.1f}%".format(ccs_chimera_rate*100.)
+    print "Chimera from missed adapter: {0:.1f}%".format(ccs_chimera_missed*100./(ccs_chimera_missed+ccs_chimera_real))
     print "----- non-CCS subread only ------"
     print "Total number of ZMWs:", nonccs_zmw_count
     print "Total number of unmapped: {0} ({1:.1f}%)".format(nonccs_unmapped, nonccs_unmapped*100./nonccs_zmw_count)
     print "Avg. coverage: {0:.1f}%".format(nonccs_avg_coverage)
     print "Avg. observed accuracy: {0:.1f}%".format(nonccs_avg_obs)
-    print "Chimera rate: {0:.1f}%".format(nonccs_chimera_rate*100.)  
+    print "Chimera rate: {0:.1f}%".format(nonccs_chimera_rate*100.)
+    print "Chimera from missed adapter: {0:.1f}%".format(nonccs_chimera_missed*100./(nonccs_chimera_missed+nonccs_chimera_real))
     print "----- Combined -------"
     a = ccs_unmapped + nonccs_unmapped
     b = ccs_zmw_count + nonccs_zmw_count
@@ -100,9 +102,21 @@ def summarize_gmap(ccs_prefix='ccs_reads.53Aseen_trimmed_changeid.fa.non_chimera
     chimera_rate = (ccs_chimera_rate*ccs_zmw_count + nonccs_chimera_rate*nonccs_zmw_count)*1./(ccs_zmw_count + nonccs_zmw_count)
     print "Chimera rate: {0:.1f}%".format(chimera_rate*100.)
 
-    eval_accuracy_by_gmap.split_gmap_outcome(ccs_prefix, ccs_prefix+'.gff')
-    eval_accuracy_by_gmap.split_gmap_outcome(nonccs_prefix, nonccs_prefix+'.gff')
+def parse_blasr(sam_filename, ref_fasta_filename):
+    """
+    Return dict of ZMW --> best r by maximizing sCov
+    """
+    hit = {}
+    for r in miscBio.SAMReader(sam_filename, True, ref_fasta_filename):
+        zmw = r.qID[:r.qID.find('/', r.qID.find('/')+1)]
+        if zmw not in hit or r.sCoverage >= hit[zmw].sCoverage:
+            hit[zmw] = r
+    return hit
 
+def tally_ref_hits(hit_by_zmw, ref_tally, min_sCov, min_qCov):
+    for r in hit_by_zmw.itervalues():
+        if r.sCoverage >= min_sCov and r.qCoverage >= min_qCov:
+            ref_tally[r.sID] += 1
 
 def summarize_blasr(ccs_prefix='ccs_reads.53Aseen_trimmed_changeid.fa.non_chimera.fa',nonccs_prefix='nonccs_subreads.53Aseen_trimmed_changeid.fa.non_chimera.fa', ref_fasta_filename='/home/UNIXHOME/etseng/share/gencode/gencode.v15.pc_transcripts.non_redundant_good.fa.nonredundant.fasta', ref_size=None):
     """
@@ -135,7 +149,7 @@ def summarize_blasr(ccs_prefix='ccs_reads.53Aseen_trimmed_changeid.fa.non_chimer
         sum(r.sCoverage>=.9 and r.qCoverage>=.9 for r in hit_nonccs.itervalues())
     print("Number of well-aligned refs: {0}/{1} ({2:.1f}%)".format(a, b, 100.*a/b))
     print("Number of well-aligned ZMWs: {0}/{1} ({2:.1f}%)".format(c, d, 100.*c/d))
-    
+
     # draw plots
     hit = hit_ccs
     hit.update(hit_nonccs)
@@ -146,10 +160,11 @@ def summarize_blasr(ccs_prefix='ccs_reads.53Aseen_trimmed_changeid.fa.non_chimer
     eval_refmap_by_blasr.draw_2dhist(hit, 'ccs_n_nonccs.sLen_vs_sCov', feat_func=lambda x: (x.sLen, x.sCoverage), filter_func=lambda x: True, xlab='Reference Length', ylab='Reference Coverage')
 
     if ref_size is None:
-        draw_coverage(hit, 'ccs_n_nonccs.ref_coverage', filter_func=lambda x: x.qCoverage>=.9, title="5'-3' reference coverage (qCov>=90%)")
+        eval_refmap_by_blasr.draw_coverage(hit, 'ccs_n_nonccs.ref_coverage', filter_func=lambda x: x.qCoverage>=.9, title="5'-3' reference coverage (qCov>=90%)")
     else:
         a, b = ref_size
-        draw_coverage(hit, 'ccs_n_nonccs.ref_coverage', filter_func=lambda x: x.qCoverage>=.9 and a<=x.sLen<=b, title="5'-3' reference coverage (qCov>=90%), ref length {0}-{1} bp".format(a,b))
+        eval_refmap_by_blasr.draw_coverage(hit, 'ccs_n_nonccs.ref_coverage', filter_func=lambda x: x.qCoverage>=.9 and a<=x.sLen<=b, title="5'-3' reference coverage (qCov>=90%), ref length {0}-{1} bp".format(a,b))
+
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
@@ -157,8 +172,8 @@ if __name__ == "__main__":
     parser.add_argument("--ref_fasta_filename", default='/home/UNIXHOME/etseng/share/gencode/gencode.v15.pc_transcripts.non_redundant_good.fa.nonredundant.fasta')
     parser.add_argument("--ref_size", default=None)
     args = parser.parse_args()
-    
-    
+
+
     summarize_CCS()
     summarize_chimera()
     summarize_gmap()

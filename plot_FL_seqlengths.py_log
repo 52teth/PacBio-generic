@@ -1,0 +1,6 @@
+import os,fnmatch
+names=fnmatch.filter(os.listdir('.'),'July*_*')
+for n in names:
+    cmd = "python /home/UNIXHOME/etseng/GitHub/PB_llee/plot_seqlengths_grouped.py {0}/ccs_reads.53Aseen_trimmed_changeid.fa,{0}/nonccs_subreads.53Aseen_trimmed_changeid.fa CCS-FL,nonCCS-FL -,- orange,magenta {0} 0 6000".format(n)
+    os.system(cmd)
+    

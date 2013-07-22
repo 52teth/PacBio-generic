@@ -24,7 +24,7 @@ def tally_ref_hits(hit_by_zmw, ref_tally, min_sCov, min_qCov):
             ref_tally[r.sID] += 1
             
 
-def draw_2dhist(hit, output_prefix, feat_func=lambda x: (x.sLen, x.qLen), filter_func=lambda x: True, xlab='Reference Length', ylab='Query length'):
+def draw_2dhist(hit, output_prefix, feat_func=lambda x: (x.sLen, x.qLen), filter_func=lambda x: True, xlab='Reference Length', ylab='Query length', title=''):
     """
     Heatmap plot of query (CCS/non-CCS) seq length VS reference length (or whatever is given)
     for which there is alignment
@@ -48,6 +48,7 @@ def draw_2dhist(hit, output_prefix, feat_func=lambda x: (x.sLen, x.qLen), filter
     ax.set_ylim(y.min(), y.max())
     ax.set_xlabel(xlab)
     ax.set_ylabel(ylab)
+    ax.set_title(title)
     fig.savefig(output_prefix+'.png', format='png')
 
 

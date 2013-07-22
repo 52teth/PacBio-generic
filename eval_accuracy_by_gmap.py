@@ -35,7 +35,23 @@ def select_random_sequences(bas_filename, out_fa, out_fq, random_prob, num_of_se
         if count >= num_of_seqs:
             return count
     return count
-            
+
+
+
+def calc_overlap(r1, r2):
+    """
+    Used for seeing whether some of the GMAP chimeras are actually missed adapters
+    Criteria:
+    (1) same chromosome
+    (2) overlap is at least 50% of both records
+    """
+    if r1.chr != r2.chr: return False
+    a = max(r1.start, r2.start)
+    b = min(r1.end, r2.end)
+    if a < b and (b-a)>=(r1.end-r1.start)*.5 and (b-a)>=(r2.end-r2.start)*.5: return True
+    return False
+
+
 def run_gmap(fa_filename, fq_filename=None, gmap_filename=None, tempdir='/scratch'):
     """
     Run gmap on FASTA file, extracting the alignment identity and comparing it with FASTQ QVs
@@ -89,37 +105,17 @@ def run_gmap(fa_filename, fq_filename=None, gmap_filename=None, tempdir='/scratc
 
     obs2exp = np.array(obs2exp, dtype=[('ObsAccuracy', '>f4'), ('ExpAccuracy', '>f4'), ('Size', '>i4')])
     #os.remove(out_filename)   
-    
-    chimera_rate = len(filter(lambda x: len(tally[x])>1, tally))*1./len(tally)
+
+    chimera_missed_adapter = 0
+    chimera_real = 0
+    for v in tally.itervalues():
+        if len(v) > 1: # gmap chimera
+            if calc_overlap(v[0], v[1]): chimera_missed_adapter += 1
+            else: chimera_real += 1
+
     avg_coverage = sum(k*v for k,v in coverages.iteritems())*1./sum(coverages.itervalues())
-    return unmapped, obs2exp, chimera_rate, avg_coverage, len(zmw_seen)
-
-
-def split_gmap_outcome(fa_filename, gmap_filename):
-    """
-    Split into:
-    .gmap_unmapped.fa
-    .gmap_chimera.fa
-    .gmap_non_chimera.fa
-    """
-    f_un = open(fa_filename + '.gmap_unmapped.fa', 'w')    
-    f_is = open(fa_filename + '.gmap_chimera.fa', 'w')
-    f_non = open(fa_filename + '.gmap_non_chimera.fa', 'w')
-    
-    d = defaultdict(lambda: 0)
-    for r in GFF.gmapGFFReader(gmap_filename):
-        d[r.seqid] += 1
+    return unmapped, obs2exp, (chimera_missed_adapter,chimera_real,(chimera_missed_adapter+chimera_real)*1./len(tally)), avg_coverage, len(zmw_seen)
         
-    for r in SeqIO.parse(open(fa_filename), 'fasta'):
-        if r.id not in d: f_un.write(">{0}\n{1}\n".format(r.id, r.seq))
-        elif d[r.id] == 1: f_non.write(">{0}\n{1}\n".format(r.id, r.seq))
-        else: f_is.write(">{0}\n{1}\n".format(r.id, r.seq))
-    
-    
-    f_un.close()
-    f_is.close()
-    f_non.close()        
-    
     
 def main(fofn_filename, prefix, random_prob=0.01, num_of_seqs=1000, use_CCS=False, min_seq_len=500):
     out_fa = open(prefix+'.fa', 'w')
