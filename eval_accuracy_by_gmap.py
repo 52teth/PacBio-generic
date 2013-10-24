@@ -166,8 +166,36 @@ def main_eval_only(fa_filename, fq_filename, gmap_filename):
     if fq_filename is not None:
         print "Avg. expected accuracy: {0:.1f}%".format(avg_exp)
     print "Avg. observed accuracy: {0:.1f}%".format(avg_obs)
-    print "Chimera rate: {0:.1f}%".format(chimera_rate*100.)                
-        
+    print "Chimera rate: {0:.1f}%".format(chimera_rate*100.)
+
+
+
+def split_gmap_outcome(fa_filename, gmap_filename):
+    """
+    Split into:
+    .gmap_unmapped.fa
+    .gmap_chimera.fa
+    .gmap_non_chimera.fa
+    """
+    f_un = open(fa_filename + '.gmap_unmapped.fa', 'w')
+    f_is = open(fa_filename + '.gmap_chimera.fa', 'w')
+    f_non = open(fa_filename + '.gmap_non_chimera.fa', 'w')
+
+    d = defaultdict(lambda: 0)
+    for r in GFF.gmapGFFReader(gmap_filename):
+        d[r.seqid] += 1
+
+    for r in SeqIO.parse(open(fa_filename), 'fasta'):
+        if r.id not in d: f_un.write(">{0}\n{1}\n".format(r.id, r.seq))
+        elif d[r.id] == 1: f_non.write(">{0}\n{1}\n".format(r.id, r.seq))
+        else: f_is.write(">{0}\n{1}\n".format(r.id, r.seq))
+
+
+    f_un.close()
+    f_is.close()
+    f_non.close()
+
+
 if __name__ == "__main__":
     global DBNAME
     from argparse import ArgumentParser
