@@ -1,0 +1,57 @@
+# IPython log file
+import sys
+from collections import defaultdict
+from csv import DictReader
+import miscBio
+import subprocess
+
+
+cmd = "hmmer_wrapper.py -d output -i nonccs_subreads.fasta --output-anyway --change-seqid --min-seqlen 500 -o nonccs_subreads.output_anyway_changeid.fa"
+if subprocess.check_call(cmd, shell=True)!=0:
+    print >> sys.stderr, "TROUBLE RUNNING COMMAND:", cmd
+    sys.exit(-1)
+
+cmd = "hmmer_wrapper.py -d outputCCS -i ccs_reads.fasta  --output-anyway --change-seqid -o ccs_reads.output_anyway_changeid.fa"
+if subprocess.check_call(cmd, shell=True)!=0:
+    print >> sys.stderr, "TROUBLE RUNNING COMMAND:", cmd
+    sys.exit(-1)
+
+
+
+reader=DictReader(open('nonccs_subreads.output_anyway_changeid.fa.primer_info.txt'),delimiter='\t')
+d=defaultdict(lambda: [])
+for r in reader:
+    d[r['ID'][:r['ID'].rfind('/')]].append(r)
+    
+reader=miscBio.FastaReader('nonccs_subreads.output_anyway_changeid.fa')
+g=(lambda lst: any((x['5seen']=='1' and x['3seen']=='1' and x['polyAseen']=='1') for x in lst))
+f=open('nonccs_subreads.output_anyway_changeid.fa.noFL.fa','w')
+for v in d.itervalues():
+    if g(v): continue
+    for x in v:
+        try:
+            r = reader[x['ID']]
+            f.write(">{0}\n{1}\n".format(r.id,r.seq))
+        except:
+            print >> sys.stderr, "ignore", x['ID']
+f.close()
+
+reader=DictReader(open('ccs_reads.output_anyway_changeid.fa.primer_info.txt'),delimiter='\t')
+d=defaultdict(lambda: [])
+for r in reader:
+    d[r['ID'][:r['ID'].rfind('/')]].append(r)
+    
+reader=miscBio.FastaReader('ccs_reads.output_anyway_changeid.fa')
+g=(lambda lst: any((x['5seen']=='1' and x['3seen']=='1' and x['polyAseen']=='1') for x in lst))
+f=open('ccs_reads.output_anyway_changeid.fa.noFL.fa','w')
+for v in d.itervalues():
+    if g(v): continue
+    for x in v:
+        try:
+            r = reader[x['ID']]
+            f.write(">{0}\n{1}\n".format(r.id,r.seq))
+        except:
+            print >> sys.stderr, "ignore", x['ID']
+        
+f.close()
+

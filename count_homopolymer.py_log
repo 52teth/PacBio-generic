@@ -1,0 +1,24 @@
+import numpy as np
+from Bio import SeqIO
+reader=SeqIO.parse(open('ccs_reads.53Aseen_trimmed_changeid.fa.non_chimera.fa.gmap_chimera.fa'),'fasta')
+def count_homo(s):
+    i = 0
+    x = s[0]
+    c = 0
+    for j,y in enumerate(s[1:]):
+        if x!=y:
+            c += ((j-i) >= 3)*(j-i)
+            i,x = j,y
+    return c
+
+#def count_homo(s): return s.count('C')+s.count('G')
+
+t1 = []
+for r in reader:
+    if r.seq[:100].find('TTTTTTTTTTTT'): t1.append(count_homo(r.seq)*1./len(r.seq))
+reader=SeqIO.parse(open('ccs_reads.53Aseen_trimmed_changeid.fa.non_chimera.fa.gmap_non_chimera.fa'),'fasta')
+t2 = []
+for r in reader:
+    if r.seq[:100].find('TTTTTTTTTTTT')==-1: t2.append(count_homo(r.seq)*1./len(r.seq))
+t1 = np.array(t1)
+t2 = np.array(t2)

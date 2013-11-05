@@ -15,8 +15,13 @@ barcode_trimmer_prefix = "53Aseen_trimmed" # should correspond to the option abo
 
 if species == 'hg19':
     cmd_cDNA = "generate_cDNApipe_bash.py --cpus 12 --cmd_filename cDNApipe.sh"
-else:
+    cmd_eval = "python /home/UNIXHOME/etseng/GitHub/PB_llee/eval_cDNApipe_results.py > evaled_summary.txt"
+elif species == 'rn5':
     cmd_cDNA = "generate_cDNApipe_bash.py --ref /mnt/secondary/Share/Smrtanalysis-alpha/opt/smrtanalysis/common/references/rat_UCSC --gmap_db rn5 --cpus 12 --cmd_filename cDNApipe.sh"
+    cmd_eval = "python /home/UNIXHOME/etseng/GitHub/PB_llee/eval_cDNApipe_results.py --ref_fasta_filename /mnt/secondary/Share/Smrtanalysis-alpha/opt/smrtanalysis/common/references/rat_UCSC/sequence/rat_UCSC.fasta > evaled_summary.txt"
+else:
+    print >> sys.stderr, "species not specified or unknown! quit!"
+    sys.exit(-1)
 
 for name in os.listdir('runs/'):
     smrt_d = os.path.join('smrtpipe', name, 'data')
@@ -48,6 +53,8 @@ for name in os.listdir('runs/'):
     cwd = os.popen("pwd").read().strip()
     os.chdir(pm_d)
     subprocess.check_call(cmd_cDNA, shell=True)
+    with open('cDNApipe.sh', 'a') as f: 
+        f.write(cmd_eval + '\n')
     cmd = "qsub -cwd -S /bin/bash -pe smp 12 cDNApipe.sh"
     print >> sys.stderr, "submitting job for ", pm_d
     subprocess.check_call(cmd, shell=True)
