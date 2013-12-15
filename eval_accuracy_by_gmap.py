@@ -4,10 +4,6 @@ import numpy as np
 from Bio import SeqIO
 from pbcore.io import BasH5Reader
 import GFF
-"""
-Randomly select subreads (or CCS reads) from a .bas.h5 file, run GMAP, then use GMAP's mapping identity to evaluate
-expected accuracy (QVs) and observed accuracy (alignment identity)
-"""
 
 def select_random_sequences(bas_filename, out_fa, out_fq, random_prob, num_of_seqs, use_CCS=False, min_seq_len=500):
     """

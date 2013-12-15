@@ -2,6 +2,7 @@ import os, sys, re, fnmatch, subprocess
 from csv import DictReader
 from pbcore.io import BasH5Reader
 from collections import defaultdict
+from Bio import SeqIO
 
 def extract_run_info(run_dir):
     """
@@ -47,6 +48,10 @@ def extract_P1(run_dir):
             zmws.append(r['seqZmw'])
             
     return p1s, zmws
+
+def get_avg_fl_len(filename):
+    tmp = [len(r.seq) for  r in SeqIO.parse(open(filename),'fasta')]
+    return sum(tmp)*1./len(tmp)
 
 def read_evaled_summary(filename):
     """
@@ -148,6 +153,7 @@ def collect_info_for_name(name):
     d = {'name':name}
     d['roi_primer'] = read_primer_summary(os.path.join('primer_match', name, 'reads_of_insert.53Aseen_trimmed_changeid.fa.primer_info.txt.summary'))
     d.update(read_evaled_summary(evaled_txt))
+    d['fl_avg_len'] = str(get_avg_fl_len(os.path.join('primer_match', name, 'reads_of_insert.53Aseen_trimmed_changeid.fa.non_chimera.fa')))
     d.update(extract_run_info(os.path.join('runs', name)))
     return d
 
@@ -155,7 +161,7 @@ def collect_info_for_name(name):
 def write_header(f):
     f.write("Sample,Machine,Cells,SequencingZMWs,Productivity (%),RoI yield,Avg. RoI readlength,,")
     f.write("5' primer seen,3' primer seen,FL %,")
-    f.write("# of FL ZMWs,Artificial Chimeras,,")
+    f.write("# of FL ZMWs,Avg. FL len,Artificial Chimeras,,")
     f.write("Input # of ZMWs,# unmapped,Avg. GMAP coverage,Avg. GMAP accuracy,GMAP chimera rate,GMAP chimera from overpriming,,")
     f.write("# of aligned refs,# of aligned ZMWs,# of well-aligned refs,# of well-aligned ZMWs\n")
 
@@ -173,6 +179,7 @@ def write_line(f, d):
     f.write(d['roi_primer']['3seen'] + ',')
     f.write(d['roi_primer']['53Aseen'] + ',')
     f.write(d['fl_zmws'] + ',')
+    f.write(d['fl_avg_len'] + ',')
     f.write(d['art_chimera'] + ',')
     f.write(',')
 

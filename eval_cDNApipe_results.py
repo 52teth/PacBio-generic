@@ -1,9 +1,9 @@
+#!/usr/bin/env python
 import os, sys
 import numpy as np
 from collections import defaultdict
 from Bio import SeqIO
 
-import miscBio
 import eval_accuracy_by_gmap
 import eval_refmap_by_blasr
 
@@ -87,7 +87,8 @@ def summarize_blasr(roi_prefix='reads_of_insert.53Aseen_trimmed_changeid.fa.non_
     2. Number of well-aligned (90% qCov, sCov) ZMWs / refs
     3. Abundance distribution of well-aligned refs
     """
-    hit_roi = eval_refmap_by_blasr.parse_blasr(roi_prefix+'.blasr.sam', ref_fasta_filename)
+    ref_len_dict = dict((r.id,len(r.seq)) for r in SeqIO.parse(open(ref_fasta_filename),'fasta'))
+    hit_roi = eval_refmap_by_blasr.parse_blasr(roi_prefix+'.blasr.sam', ref_len_dict)
 
     tally0 = defaultdict(lambda: 0)
     tally90 = defaultdict(lambda: 0)
@@ -113,16 +114,16 @@ def summarize_blasr(roi_prefix='reads_of_insert.53Aseen_trimmed_changeid.fa.non_
     # draw plots
     hit = hit_roi
 
-    eval_refmap_by_blasr.draw_2dhist(hit, png_name_prefix+'roi.sLen_vs_qLen', feat_func=lambda x: (x.sLen, x.qLen), filter_func=lambda x: True, xlab='Reference Length', ylab='Query length')
-    eval_refmap_by_blasr.draw_2dhist(hit, png_name_prefix+'roi.sLen_vs_qLen_well', feat_func=lambda x: (x.sLen, x.qLen), filter_func=lambda x: x.qCoverage>=.9 and x.sCoverage>=.9, xlab='Reference Length', ylab='Query length')
-    eval_refmap_by_blasr.draw_2dhist(hit, png_name_prefix+'roi.sCov_vs_qCov', feat_func=lambda x: (x.sCoverage, x.qCoverage), filter_func=lambda x: True, xlab='Reference Coverage', ylab='Query Coverage')
-    eval_refmap_by_blasr.draw_2dhist(hit, png_name_prefix+'roi.sLen_vs_sCov', feat_func=lambda x: (x.sLen, x.sCoverage), filter_func=lambda x: True, xlab='Reference Length', ylab='Reference Coverage')
+    eval_refmap_by_blasr.draw_2dhist(hit, png_name_prefix+'.roi.sLen_vs_qLen', feat_func=lambda x: (x.sLen, x.qLen), filter_func=lambda x: True, xlab='Reference Length', ylab='Query length')
+    eval_refmap_by_blasr.draw_2dhist(hit, png_name_prefix+'.roi.sLen_vs_qLen_well', feat_func=lambda x: (x.sLen, x.qLen), filter_func=lambda x: x.qCoverage>=.9 and x.sCoverage>=.9, xlab='Reference Length', ylab='Query length')
+    eval_refmap_by_blasr.draw_2dhist(hit, png_name_prefix+'.roi.sCov_vs_qCov', feat_func=lambda x: (x.sCoverage, x.qCoverage), filter_func=lambda x: True, xlab='Reference Coverage', ylab='Query Coverage')
+    eval_refmap_by_blasr.draw_2dhist(hit, png_name_prefix+'.roi.sLen_vs_sCov', feat_func=lambda x: (x.sLen, x.sCoverage), filter_func=lambda x: True, xlab='Reference Length', ylab='Reference Coverage')
 
     if ref_size is None:
-        eval_refmap_by_blasr.draw_coverage(hit, png_name_prefix+'roi.ref_coverage', filter_func=lambda x: x.qCoverage>=.9, title="5'-3' reference coverage (qCov>=90%)")
+        eval_refmap_by_blasr.draw_coverage(hit, png_name_prefix+'.roi.ref_coverage', filter_func=lambda x: x.qCoverage>=.9, title="5'-3' reference coverage (qCov>=90%)")
     else:
         a, b = ref_size
-        eval_refmap_by_blasr.draw_coverage(hit, png_name_prefix+'roi.ref_coverage', filter_func=lambda x: x.qCoverage>=.9 and a<=x.sLen<=b, title="5'-3' reference coverage (qCov>=90%), ref length {0}-{1} bp".format(a,b))
+        eval_refmap_by_blasr.draw_coverage(hit, png_name_prefix+'.roi.ref_coverage', filter_func=lambda x: x.qCoverage>=.9 and a<=x.sLen<=b, title="5'-3' reference coverage (qCov>=90%), ref length {0}-{1} bp".format(a,b))
 
 
 if __name__ == "__main__":
@@ -146,13 +147,13 @@ if __name__ == "__main__":
         summarize_blasr(ref_fasta_filename=args.ref_fasta_filename, ref_size=args.ref_size, png_name_prefix=name)
     
     # plot FL seq length
-    cmd = "python /home/UNIXHOME/etseng/GitHub/PB_llee/plot_seqlengths_grouped.py reads_of_insert.53Aseen_trimmed_changeid.fa.non_chimera.fa {name} - blue {name}.FL_seqlength 0 6000".format(name=name)
+    cmd = "plot_seqlengths_grouped.py reads_of_insert.53Aseen_trimmed_changeid.fa.non_chimera.fa {name} - blue {name}.FL_seqlength 0 8000".format(name=name)
     print >> sys.stderr, "CMD:", cmd
     assert os.system(cmd) == 0
     # plot FL % bin by length
-    cmd = "python /home/UNIXHOME/etseng/GitHub/PB_llee/bin_FL_by_size.py_log"
+    cmd = "bin_FL_by_size.py"
     print >> sys.stderr, "CMD:", cmd
     assert os.system(cmd) == 0
-    cmd = "python /home/UNIXHOME/etseng/GitHub/PB_llee/plot_FL_by_in.py reads_of_insert.53Aseen_trimmed_changeid.fa.primer_info.txt.bin_by_len.txt {name} - purple {name}".format(name=name)
+    cmd = "plot_FL_by_in.py reads_of_insert.53Aseen_trimmed_changeid.fa.primer_info.txt.bin_by_len.txt {name} - purple {name}".format(name=name)
     print >> sys.stderr, "CMD:", cmd
     assert os.system(cmd) == 0

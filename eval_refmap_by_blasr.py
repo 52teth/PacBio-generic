@@ -2,14 +2,14 @@ import os, sys
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
-import miscBio
+import BioReaders
 
 def parse_blasr(sam_filename, ref_fasta_filename):
     """
     Return dict of ZMW --> best r by maximizing sCov
     """
     hit = {}
-    for r in miscBio.SAMReader(sam_filename, True, ref_fasta_filename):
+    for r in BioReaders.BLASRSAMReader(sam_filename, True, ref_fasta_filename):
         zmw = r.qID[:r.qID.find('/', r.qID.find('/')+1)]
         if zmw not in hit or r.sCoverage >= hit[zmw].sCoverage:
             hit[zmw] = r
