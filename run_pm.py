@@ -20,12 +20,19 @@ elif species == 'mm10':
     transcript_ref_dir = '/mnt/secondary/Share/Smrtanalysis-alpha/opt/smrtanalysis/common/references/mouse_UCSC'
     transcript_ref_fasta = '/mnt/secondary/Share/Smrtanalysis-alpha/opt/smrtanalysis/common/references/mouse_UCSC/sequence/mouse_UCSC.fasta'
     gmap_db_name = 'mm10'
+elif species == 'skip':
+    transcript_ref_dir = 'NA'
+    transcript_ref_fasta = 'NA'
+    gmap_db_name = 'NA'
 else:
     print >> sys.stderr, "species not specified or unknown! quit!"
     sys.exit(-1)
 
 cmd_cDNA = "generate_cDNApipe_bash.py --ref {0} --gmap_db {1} --gmap_db_dir {2} --cpus {3} --cmd_filename cDNApipe.sh".format(transcript_ref_dir, gmap_db_name, gmap_db_dir, NUM_CPUS)
-cmd_eval = "eval_cDNApipe_results.py --ref_fasta_filename {0} > evaled_summary.txt".format(transcript_ref_fasta)
+if species == 'skip':
+    cmd_eval = "eval_cDNApipe_results.py --skip-GMAP --skip-BLASR > evaled_summary.txt"
+else:
+    cmd_eval = "eval_cDNApipe_results.py --ref_fasta_filename {0} > evaled_summary.txt".format(transcript_ref_fasta)
 
 # ----------------------- SETTINGS --------------------- #
 

@@ -25,11 +25,13 @@ def get_chimera(bash_f, args):
         
 @check_file_or_run('reads_of_insert.53Aseen_trimmed_changeid.fa.non_chimera.fa.blasr.sam')        
 def run_BLASR(bash_f, args):
-    bash_f.write("pbalign.py --maxHits 10 --hitPolicy all --algorithmOptions \"-nproc {cpus} -bestn 10 -nCandidates 10\"  reads_of_insert.53Aseen_trimmed_changeid.fa.non_chimera.fa  {ref} reads_of_insert.53Aseen_trimmed_changeid.fa.non_chimera.fa.blasr.sam\n".format(cpus=args.cpus, ref=args.ref))    
+    if args.ref != 'NA':
+        bash_f.write("pbalign.py --maxHits 10 --hitPolicy all --algorithmOptions \"-nproc {cpus} -bestn 10 -nCandidates 10\"  reads_of_insert.53Aseen_trimmed_changeid.fa.non_chimera.fa  {ref} reads_of_insert.53Aseen_trimmed_changeid.fa.non_chimera.fa.blasr.sam\n".format(cpus=args.cpus, ref=args.ref))    
 
 @check_file_or_run('reads_of_insert.53Aseen_trimmed_changeid.fa.non_chimera.fa.gff.log')
 def run_gmap(bash_f, args):
-    bash_f.write("gmap -D {gmap_db_dir} -d {gmap_db} -t {cpus} -f gff3_gene -n 0 reads_of_insert.53Aseen_trimmed_changeid.fa.non_chimera.fa > reads_of_insert.53Aseen_trimmed_changeid.fa.non_chimera.fa.gff 2> reads_of_insert.53Aseen_trimmed_changeid.fa.non_chimera.fa.gff.log\n".format(cpus=args.cpus, gmap_db=args.gmap_db, gmap_db_dir=args.gmap_db_dir))
+    if args.gmap_db != 'NA':
+        bash_f.write("gmap -D {gmap_db_dir} -d {gmap_db} -t {cpus} -f gff3_gene -n 0 reads_of_insert.53Aseen_trimmed_changeid.fa.non_chimera.fa > reads_of_insert.53Aseen_trimmed_changeid.fa.non_chimera.fa.gff 2> reads_of_insert.53Aseen_trimmed_changeid.fa.non_chimera.fa.gff.log\n".format(cpus=args.cpus, gmap_db=args.gmap_db, gmap_db_dir=args.gmap_db_dir))
     
 
 def main(args):

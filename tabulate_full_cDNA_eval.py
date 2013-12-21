@@ -150,7 +150,8 @@ def collect_info_for_name(name):
     if not os.path.exists(evaled_txt):
         print >> sys.stderr, "{0} does not exist. SKIP!".format(evaled_txt)
         return None
-    d = {'name':name}
+    d = defaultdict(lambda: 'NA')
+    d['name'] = name
     d['roi_primer'] = read_primer_summary(os.path.join('primer_match', name, 'reads_of_insert.53Aseen_trimmed_changeid.fa.primer_info.txt.summary'))
     d.update(read_evaled_summary(evaled_txt))
     d['fl_avg_len'] = str(get_avg_fl_len(os.path.join('primer_match', name, 'reads_of_insert.53Aseen_trimmed_changeid.fa.non_chimera.fa')))
