@@ -46,19 +46,19 @@ with open(input) as f:
         num_read_53seen += see5 and see3
         num_read_53Aseen += see5 and see3 and seeA
 
-print "------ 5' primer seen sumary ---- "
+print "------ 5' primer seen summary ---- "
 tmp = sum(any(x) for x in ZMW_5seen.itervalues())
 num_ZMW = len(ZMW_5seen)
 assert num_ZMW == len(ZMW_3seen)
 print "Per ZMW:     {0}/{1} ({2:.1f}%)".format(tmp, num_ZMW, tmp*100./num_ZMW)
 tmp = sum((len(x)>0 and x[0]) for x in ZMW_5seen.itervalues())
 
-print "------ 3' primer seen sumary ---- "
+print "------ 3' primer seen summary ---- "
 tmp = sum(any(x) for x in ZMW_3seen.itervalues())
 print "Per ZMW:     {0}/{1} ({2:.1f}%)".format(tmp, num_ZMW, tmp*100./num_ZMW)
 tmp = sum((len(x)>0 and x[0]) for x in ZMW_3seen.itervalues())
 
-print "------ 5'&3' primer seen sumary ---- "
+print "------ 5'&3' primer seen summary ---- "
 tmp = 0
 for zmw,x in  ZMW_5seen.iteritems():
     for i in xrange(len(x)):
@@ -68,7 +68,7 @@ for zmw,x in  ZMW_5seen.iteritems():
 print "Per ZMW:     {0}/{1} ({2:.1f}%)".format(tmp, num_ZMW, tmp*100./num_ZMW)
 tmp = sum([(len(x)>0 and x[0] and len(ZMW_3seen[zmw])>0 and ZMW_3seen[zmw][0]) for (zmw,x) in ZMW_5seen.iteritems()])
 
-print "------ 5'&3'&polyA primer seen sumary ---- "
+print "------ 5'&3'&polyA primer seen summary ---- "
 tmp = 0
 for zmw,x in  ZMW_5seen.iteritems():
     for i in xrange(len(x)):

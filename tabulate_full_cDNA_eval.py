@@ -29,7 +29,7 @@ def extract_run_info(run_dir):
     # get P1
     p1s, zmws = extract_P1(run_dir)
     p1s.sort()
-    return {'machines': ",".join(machines), "cells":str(count_cells), "loading":"|".join(p1s), "seqZmws":str(sum(int(x) for x in zmws))}
+    return {'machines': "|".join(machines), "cells":str(count_cells), "loading":"|".join(p1s), "seqZmws":str(sum(int(x) for x in zmws))}
 
 def extract_P1(run_dir):
     """
@@ -130,13 +130,13 @@ def read_primer_summary(filename):
     """
     d = defaultdict(lambda: -1)
     with open(filename) as f:
-        assert f.readline().startswith("------ 5' primer seen sumary ----")
+        assert f.readline().startswith("------ 5' primer seen")
         d['5seen'] = f.readline().strip().split()[-1][1:-1]
-        assert f.readline().startswith("------ 3' primer seen sumary ----")
+        assert f.readline().startswith("------ 3' primer seen")
         d['3seen'] = f.readline().strip().split()[-1][1:-1]
-        assert f.readline().startswith("------ 5'&3' primer seen sumary ----")
+        assert f.readline().startswith("------ 5'&3' primer seen")
         f.readline()
-        assert f.readline().startswith("------ 5'&3'&polyA primer seen sumary ----")
+        assert f.readline().startswith("------ 5'&3'&polyA primer seen")
         d['53Aseen'] = f.readline().strip().split()[-1][1:-1]
     return d
 
@@ -210,4 +210,5 @@ def main():
             write_line(f, d)
     f.close()
 
-main()
+if __name__ == "__main__":
+    main()
