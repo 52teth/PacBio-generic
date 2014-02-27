@@ -147,7 +147,7 @@ if __name__ == "__main__":
         summarize_blasr(ref_fasta_filename=args.ref_fasta_filename, ref_size=args.ref_size, png_name_prefix=name)
     
     # plot FL seq length
-    cmd = "plot_seqlengths_grouped.py reads_of_insert.53Aseen_trimmed_changeid.fa.non_chimera.fa {name} - blue {name}.FL_seqlength 0 8000".format(name=name)
+    cmd = "plot_seqlengths_grouped.py reads_of_insert.53Aseen_trimmed_changeid.fa.non_chimera.fa {name} - blue {name}.FL_seqlength 0 12000".format(name=name)
     print >> sys.stderr, "CMD:", cmd
     assert os.system(cmd) == 0
     # plot FL % bin by length
