@@ -31,6 +31,7 @@ def main():
         rnames = os.listdir(os.path.join('runs/', dirname))
         rnames.sort()
         for runname in rnames:
+            if not os.path.isdir(os.path.join('runs/', dirname, runname)): continue
             try:
                 xml =  os.path.join('runs/', dirname, runname, fnmatch.filter(os.listdir(os.path.join('runs/', dirname, runname)), '*.metadata.xml')[0])
                 print runname+":",os.path.basename(xml)[:-19],"-".join(get_cell_info(xml))

@@ -20,6 +20,9 @@ bins = (range_max-range_min)/100+1
 for input,name,style,color in zip(inputs,names,styles,colors):
     raw = [len(r.seq) for r in SeqIO.parse(open(input), 'fasta')]
     raw = filter(lambda x: range_min<=x<=range_max, raw)
+    # fake add in min and max
+    raw.append(range_min)
+    raw.append(range_max)
 
     seqlengths = np.array(raw)
     y,binEdges = np.histogram(seqlengths, bins=bins, normed=True)
