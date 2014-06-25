@@ -4,6 +4,7 @@ import numpy as np
 from Bio import SeqIO
 from pbcore.io import BasH5Reader
 import GFF
+import BioReaders
 
 def select_random_sequences(bas_filename, out_fa, out_fq, random_prob, num_of_seqs, use_CCS=False, min_seq_len=500):
     """
@@ -36,15 +37,16 @@ def select_random_sequences(bas_filename, out_fa, out_fq, random_prob, num_of_se
 
 def calc_overlap(r1, r2):
     """
+    r1, r2 --- BioReaders.GMAPSAMRecord
     Used for seeing whether some of the GMAP chimeras are actually missed adapters
     Criteria:
     (1) same chromosome
     (2) overlap is at least 50% of both records
     """
-    if r1.chr != r2.chr: return False
-    a = max(r1.start, r2.start)
-    b = min(r1.end, r2.end)
-    if a < b and (b-a)>=(r1.end-r1.start)*.5 and (b-a)>=(r2.end-r2.start)*.5: return True
+    if r1.sID != r2.sID: return False
+    a = max(r1.qStart, r2.qStart)
+    b = min(r1.qEnd, r2.qEnd)
+    if a < b and (b-a)>=(r1.qEnd-r1.qStart)*.5 and (b-a)>=(r2.qEnd-r2.qStart)*.5: return True
     return False
 
 
@@ -64,8 +66,10 @@ def run_gmap(fa_filename, fq_filename=None, gmap_filename=None, tempdir='/scratc
         
     tally = defaultdict(lambda: []) # perZMW --> gmapRecord
     coverages = defaultdict(lambda: 0)
-    for r in GFF.gmapGFFReader(out_filename):
-        tally[r.seqid].append(r)
+    query_len_dict = dict((r.id, len(r.seq)) for r in SeqIO.parse(open(fa_filename), 'fasta'))
+    for r in BioReaders.GMAPSAMReader(out_filename, True, query_len_dict=query_len_dict):
+        if r.sID != '*':
+            tally[r.qID].append(r)
     
     obs2exp = [] # (exp. avg. accuracy, obs. avg. accuracy, size)
     unmapped = 0 # count of not aligned by GMAP
@@ -81,10 +85,10 @@ def run_gmap(fa_filename, fq_filename=None, gmap_filename=None, tempdir='/scratc
                 unmapped += 1
             else:
                 if len(tally[r.id]) == 1:
-                    coverages[tally[r.id][0].coverage] += 1
+                    coverages[int(tally[r.id][0].qCoverage*100)] += 1
                 for gmap_rec in tally[r.id]:
-                    for score, seq_exon in zip(gmap_rec.scores, gmap_rec.seq_exons):
-                        obs2exp.append((score, score, seq_exon.end-seq_exon.start))
+                    score = gmap_rec.identity*100.
+                    obs2exp.append((score, score, gmap_rec.qEnd-gmap_rec.qStart))
     else:
         for r in SeqIO.parse(open(fq_filename), 'fastq'):
             zmw = r.id[:r.id.rfind('/')]
@@ -95,9 +99,11 @@ def run_gmap(fa_filename, fq_filename=None, gmap_filename=None, tempdir='/scratc
                 unmapped += 1
             else:
                 for gmap_rec in tally[r.id]:
-                    for score, seq_exon in zip(gmap_rec.scores, gmap_rec.seq_exons):
-                        obs_acc = np.mean([1-10**-(x/10.) for x in r.letter_annotations['phred_quality'][seq_exon.start:seq_exon.end]])
-                        obs2exp.append((obs_acc*100., score, seq_exon.end-seq_exon.start))
+                    score = gmap_rec.identity*100.
+                    s, e = gmap_rec.qStart, gmap_rec.qEnd
+                    exp_err = sum(10**(-x/10.) for x in r.letter_annotations['phred_quality'][s:e])
+                    exp_acc = 1 - exp_err/(e-s)
+                    obs2exp.append((exp_acc*100., score, e-s))
 
     obs2exp = np.array(obs2exp, dtype=[('ObsAccuracy', '>f4'), ('ExpAccuracy', '>f4'), ('Size', '>i4')])
     #os.remove(out_filename)   
@@ -178,8 +184,9 @@ def split_gmap_outcome(fa_filename, gmap_filename):
     f_non = open(fa_filename + '.gmap_non_chimera.fa', 'w')
 
     d = defaultdict(lambda: 0)
-    for r in GFF.gmapGFFReader(gmap_filename):
-        d[r.seqid] += 1
+    for r in BioReaders.GMAPSAMReader(gmap_filename, True):
+        if r.sID != '*':
+            d[r.qID] += 1
 
     for r in SeqIO.parse(open(fa_filename), 'fasta'):
         if r.id not in d: f_un.write(">{0}\n{1}\n".format(r.id, r.seq))
