@@ -38,7 +38,7 @@ def get_flnc_len_range(filename='isoseq_flnc.fasta'):
 def get_artificial_concatemer(filename='isoseq_primer_info.csv'):
     from csv import DictReader
     total, chim = 0, 0
-    for r in DictReader(open(filename), delimiter='\t'):
+    for r in DictReader(open(filename), delimiter=','):
         total += 1
         chim += r['chimera']=='1'
     print "Estimated artificial concatemer rate: {0}/{1} ({2:.2f}%)".format(chim, total, 100.*chim/total)
