@@ -92,7 +92,7 @@ for name in os.listdir('runs/'):
     subprocess.check_call(cmd_cDNA, shell=True)
     with open('cDNApipe.sh', 'a') as f: 
         f.write(cmd_eval + '\n')
-    cmd = "qsub -cwd -S /bin/bash -pe smp {cpus} cDNApipe.sh".format(cpus=NUM_CPUS)
+    cmd = "qsub -cwd -V -S /bin/bash -pe smp {cpus} cDNApipe.sh".format(cpus=NUM_CPUS)
     print >> sys.stderr, "submitting job for ", pm_d
     subprocess.check_call(cmd, shell=True)
     os.chdir(cwd)
