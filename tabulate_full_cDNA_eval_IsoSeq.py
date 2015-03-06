@@ -135,6 +135,9 @@ def read_classify_summary(filename):
     Average full-length non-chimeric read length=1718
     """
     d = defaultdict(lambda: -1)
+    if not os.path.exists(filename):
+        print >> sys.stderr, "{0} does not exist return empty dict.".format(filename)
+        return d
     with open(filename) as f:
         line = f.readline().strip()
         assert line.startswith("Number of reads of insert=")
