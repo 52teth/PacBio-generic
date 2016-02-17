@@ -13,14 +13,14 @@ def get_P1(run_dir, force_recalc=False):
                 result[r['Name']] = (int(r['seqZmw']), int(r['allZmw']))                
     else:
         f = open(filename, 'w')
-        f.write("Name,allZmw,seqZmw,P1,avgLen\n")
+        f.write("Name,allZmw,seqZmw,P1,avgLen,minLen,maxLen\n")
         for file in os.popen("ls {0}/*/Analysis_Results/*.bax.h5".format(run_dir)).read().strip().split('\n'):
             bas = BasH5Reader(file)
             name = os.path.basename(file)
             a = len(bas.sequencingZmws)
             b = len(bas.allSequencingZmws)
             lens = [len(bas[x].read()) for x in bas.sequencingZmws]
-            f.write("{0},{1},{2},{3:.2f},{4:.0f}\n".format(bas.movieName, b, a, 100.*a/b, sum(lens)*1./a))
+            f.write("{0},{1},{2},{3:.2f},{4:.0f},{5},{6}\n".format(bas.movieName, b, a, 100.*a/b, sum(lens)*1./a, min(lens), max(lens)))
             if bas.movieName not in result: result[bas.movieName] = (a, b)
             else: result[bas.movieName] = (a+result[bas.movieName][0], b+result[bas.movieName][1])
         f.close()

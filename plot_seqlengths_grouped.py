@@ -35,6 +35,6 @@ for input,name,style,color in zip(inputs,names,styles,colors):
 ax1.legend()
 plt.xlabel("Sequence Length")
 plt.ylabel("Density")
-plt.ylim((0, max(ysmooth)+0.001))
+plt.ylim((0, max(ysmooth)+0.005))
 plt.show()
 plt.savefig(output,dpi=300)

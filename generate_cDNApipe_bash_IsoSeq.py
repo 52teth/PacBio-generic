@@ -20,6 +20,8 @@ def run_BLASR(bash_f, args):
 def run_gmap(bash_f, args):
     if args.gmap_db != 'NA':
         bash_f.write("~/bin/gmap -D {gmap_db_dir} -d {gmap_db} -t {cpus} -f samse -n 0 isoseq_flnc.fasta > isoseq_flnc.fasta.sam 2> isoseq_flnc.fasta.sam.log\n".format(cpus=args.cpus, gmap_db=args.gmap_db, gmap_db_dir=args.gmap_db_dir))
+        bash_f.write("sort -k 3,3 -k 4,4n isoseq_flnc.fasta.sam > isoseq_flnc.fasta.sorted.sam\n")
+        bash_f.write("collapse_isoforms_by_sam.py --input isoseq_flnc.fasta -s isoseq_flnc.fasta.sorted.sam -c 0.99 -i 0.95 -o isoseq_flnc.5merge_c99i95\n")
     
 
 def main(args):

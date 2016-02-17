@@ -29,7 +29,7 @@ def extract_run_info(run_dir):
     # get P1
     p1s, zmws, avgLens = extract_P1(run_dir)
     p1s.sort()
-    return {'machines': "|".join(machines), "cells":str(count_cells), "loading":"|".join(p1s), "seqZmws":str(sum(int(x) for x in zmws)), "avgLens":"|".join(avgLens)}
+    return {'machines': "|".join(machines), "cells":str(count_cells), "loading":"|".join(map("{0:.1f}".format,p1s)), "seqZmws":str(sum(int(x) for x in zmws)), "avgLens":"|".join(map(str,avgLens))}
 
 def extract_P1(run_dir):
     """
@@ -40,14 +40,20 @@ def extract_P1(run_dir):
     if not os.path.exists(file):
         cmd = "calc_loading_P1.py " + run_dir
         assert subprocess.check_call(cmd, shell=True) == 0
-    p1s = []
-    zmws = []
-    avgLens = []
+    p1s = defaultdict(lambda: [])
+    zmws = defaultdict(lambda: [])
+    avgLens = defaultdict(lambda: [])
+    names = set()
     with open(file, 'r') as f:
         for r in DictReader(f, delimiter=','):
-            p1s.append(r['P1'])
-            zmws.append(r['seqZmw'])
-            avgLens.append(r['avgLen']) 
+            names.add(r['Name'])
+            p1s[r['Name']].append(float(r['P1']))
+            zmws[r['Name']].append(int(r['seqZmw']))
+            avgLens[r['Name']].append(int(r['avgLen'])) 
+
+    p1s = [sum(p1s[n])*1./len(p1s[n]) for n in names ]
+    zmws = [sum(zmws[n])*1/len(zmws[n]) for  n in names ]
+    avgLens = [sum(avgLens[n])*1/len(avgLens[n]) for n in names ]
     return p1s, zmws, avgLens
 
 def read_evaled_summary(filename):

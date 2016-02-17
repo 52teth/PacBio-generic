@@ -4,7 +4,7 @@
 Quick script that takes the symbolic links from smrtpipe/
 And make up the corressponding runs/
 """
-
+import sys
 import os,glob
 from collections import defaultdict
 
@@ -12,6 +12,9 @@ global_seen = set()
 
 dirs = os.listdir('smrtpipe')
 for d in dirs:
+    if not os.path.isdir(os.path.join('smrtpipe',d)) or d.endswith('newCCS'):
+        print >> sys.stderr, "ignoring", d
+        continue
     fofn = os.path.join('smrtpipe', d, 'input.fofn')
     seen = defaultdict(lambda: [])
     for line in open(fofn):
@@ -26,7 +29,10 @@ for d in dirs:
         name = path.split('/')[-1]
         seen[name].append(path)
     d2 = os.path.join('runs', d)
-    if not os.path.exists(d2): os.makedirs(d2)
+    if os.path.exists(d2): 
+        print >> sys.stderr, "{0} already exists. skip".format(d2)
+        continue
+    os.makedirs(d2)
     os.chdir(d2)
     for name,links in seen.iteritems():
         for i,link in enumerate(links):
