@@ -3,11 +3,17 @@ import os, sys
 import numpy as np
 from Bio import SeqIO
 
+def type_fa_or_fq(file):
+    file = file.upper()
+    if file.endswith('.FA') or file.endswith('.FASTA'): return 'fasta'
+    else: return 'fastq'
+
 file = sys.argv[1]
+print type_fa_or_fq(file)
 
 f = open(file + '.seqlengths.txt', 'w')
 lens = []
-for r in SeqIO.parse(open(file),'fasta'):
+for r in SeqIO.parse(open(file), type_fa_or_fq(file)):
     f.write(r.id + '\t' + str(len(r.seq)) + '\n')
     lens.append(len(r.seq))
 f.close()

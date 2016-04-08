@@ -42,9 +42,10 @@ def summarize_primer_info(filename="isoseq_draft.primer_info.csv"):
         flnc_lengths = np.array(flnc_lengths)
         _low, _high = np.percentile(flnc_lengths, [5, 95])
 
-    return {'num_ccs': num_read, '5seen':num_read_fiveseen, '3seen':num_read_threeseen, \
-            '53seen': num_read_5threeseen, '53Aseen': num_read_53Aseen, 'fl_zmws': num_read_FLNC, \
-            'primer_counts': dict(pm_count), 'flnc_avg_len': np.mean(flnc_lengths), \
+    return {'num_ccs': num_read, '5seen':num_read_fiveseen*100./num_read, '3seen':num_read_threeseen*100./num_read, \
+            '53seen': num_read_5threeseen*100./num_read, '53Aseen': num_read_53Aseen*100./num_read, \
+            'fl_zmws': num_read_FLNC, 'fl_percent': num_read_FLNC*100./num_read, \
+            'primer_counts': dict(pm_count), 'fl_avg_len': np.mean(flnc_lengths), \
             'flnc_len_range': "{0:.0f}-{1:.0f}".format(_low, _high), \
             "art_chimera": "{0} ({1:.2f}%)".format(num_chim, num_chim*100./num_read_FLNC)}
 

@@ -7,6 +7,6 @@ listfile = sys.argv[2]
 
 seqs = [line.strip() for line in open(listfile)]
 for r in SeqIO.parse(open(fastafile), 'fasta'):
-    if r.id in seqs: 
+    if r.id in seqs or r.id.split('|')[0] in seqs:
         print ">" + r.id
         print r.seq

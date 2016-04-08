@@ -66,8 +66,11 @@ def collect_info_for_name(name):
     """
     d = defaultdict(lambda: 'NA')
     d['name'] = name
-    d.update(summarize_primer_info(os.path.join('smrtpipe', name, 'isoseq_draft.primer_info.csv')))
     d.update(extract_run_info(os.path.join('runs', name)))
+    if not os.path.exists(os.path.join('smrtpipe', name, 'isoseq_draft.primer_info.csv')):
+        print >> sys.stderr, "skipping", name
+        return d
+    d.update(summarize_primer_info(os.path.join('smrtpipe', name, 'isoseq_draft.primer_info.csv')))
     return d
 
 #fields = ['machines', 'cells', 'ZMWs', 'P1', 'roi_yield', 'roi_avg_len', 'nonroi_avg_len', '
@@ -84,11 +87,10 @@ def write_line(f, d):
     f.write(d['loading'] + ',')
     f.write(d['avgLens'] + ',')
 
-    f.write(',')
     f.write(str(d['num_ccs']) + ',')
     f.write(str(d['5seen']) + ',')
     f.write(str(d['3seen']) + ',')
-    f.write(str(d['53Aseen']) + ',')
+    f.write(str(d['fl_percent']) + ',')
     f.write(str(d['fl_zmws']) + ',')
     f.write(str(d['fl_avg_len']) + ',')
     f.write(str(d['flnc_len_range']) + ',')
@@ -108,24 +110,28 @@ def main():
         d = collect_info_for_name(x)
         if d is not None:
             write_line(f, d)
-            pm_dict[name] = d['primer_count']
+            pm_dict[name] = d['primer_counts']
     f.close()
 
     # write primer information
     with open('cDNA_summary.primer_counts.txt', 'w') as f:
         keys = set()
-        for v in pm_dict.itervalues(): keys = keys.union(v.keys())
+        for v in pm_dict.itervalues():
+            if type(v) is dict:
+                keys = keys.union(v.keys())
         keys = list(keys)
         keys.sort()
 
         f.write("sample,total," + ",".join(keys) + '\n')
         for sample, pm_count in pm_dict.iteritems():
-            f.write(sample + ',')
+            if type(pm_count) is not dict: continue
+            f.write(os.path.basename(sample) + ',')
             total = sum(pm_count.itervalues())
             f.write(str(total))
             for k in keys:
                 if k not in pm_count: f.write(",0%")
                 else: f.write(",{0:.0f}%".format(pm_count[k]*100./total))
+            f.write('\n')
 
 
 if __name__ == "__main__":

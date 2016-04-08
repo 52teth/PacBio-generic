@@ -353,7 +353,7 @@ class SAMRecord:
             flag -= 4
         if flag >= 2:
             flag -= 2
-        assert flag == 0 or flag == 1
+        #assert flag == 0 or flag == 1
         is_paired = flag == 1
         return SAMRecord.SAMflag(is_paired, strand, PE_read_num)
             
