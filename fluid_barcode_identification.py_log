@@ -1,0 +1,6 @@
+# IPython log file
+
+from classify_barcode import Classifier, ChimeraDetectionOptions
+opt = ChimeraDetectionOptions(50, 30, 100, 50, 150, True)
+c = Classifier(opts=opt, reuse_dom=True, reads_fn='ccs.fasta', primer_fn_forward='custom_barcode_primers_forward.fa', primer_fn_reverse='custom_barcode_primers_reverse.fa', cpus=12, out_nfl_fn='isoseq_nfl.fasta', out_flnc_fn='isoseq_flnc.fasta')
+c.run()
