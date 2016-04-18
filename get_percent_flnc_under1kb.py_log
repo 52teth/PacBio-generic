@@ -1,0 +1,8 @@
+# IPython log file
+
+from Bio import SeqIO
+import numpy as np
+lens = []
+for r in SeqIO.parse(open('isoseq_flnc.fasta'),'fasta'): lens.append(len(r.seq))
+lens = np.array(lens)
+print sum(lens < 1000), len(lens), sum(lens < 1000)*.1/len(lens)

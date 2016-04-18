@@ -1,0 +1,17 @@
+# IPython log file
+
+from Bio import SeqIO
+from csv import DictReader
+reader = DictReader(open('isoseq_primer_info.csv'),delimiter=',')
+from collections import defaultdict
+ccs_count = defaultdict(lambda: 0)
+fl_count = defaultdict(lambda: 0)
+def is_fl(r): return r['fiveseen']=='1' and r['threeseen']=='1' and r['polyAseen']=='1' and r['chimera']=='0'
+reader = DictReader(open('isoseq_primer_info.csv'),delimiter=',')
+for r in reader:
+    movie = r['id'].split('/')[0]
+    ccs_count[movie] += 1
+    if is_fl(r): fl_count[movie] += 1
+    
+for k,v in ccs_count.iteritems(): print k,v
+for k,v in fl_count.iteritems(): print k,v

@@ -1,0 +1,19 @@
+# IPython log file
+import os, sys
+from collections import defaultdict
+f = open('bax2bam.sh', 'w')
+f.write("#!/bin/bash\n")
+baxes = [line.strip() for line in open('input.fofn')]
+d = defaultdict(lambda: [])
+for bax in baxes:
+    p = os.path.basename(bax.split('.')[0])
+    d[p].append(bax)
+
+for movie, baxes in d.iteritems():
+    out = movie + '.subreads.bam'
+    if os.path.exists(out):
+        print >> sys.stderr, "skipping", out
+    else:
+        f.write("bax2bam {0}\n".format(" ".join(b for b in baxes)))
+    
+f.close()

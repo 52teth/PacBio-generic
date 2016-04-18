@@ -1,0 +1,20 @@
+# IPython log file
+import os, sys
+import glob
+files = glob.glob('*.subreads.bam')
+i = 0
+for file in files:
+    n = file[:file.find('.')]
+    if os.path.exists(n + '.ccs.bam'):
+        print >> sys.stderr, "skipping", n
+        continue
+    f = open('cmd_' + str(i), 'w')
+    cmd = "ccs --noPolish --minLength 100 --maxLength 20000 --minPasses 1 --minPredictedAccuracy 0.80 --numThreads 12 --minZScore -999999 --maxDropFrac 0.8 --reportFile {0}.ccs.report {0}.ccs.bam {0}.subreads.bam\n".format(n)
+    f.write(cmd)
+    f.close()
+#    qcmd = "qsub -cwd -S /bin/bash -pe smp 12 -V -q def66 " + f.name
+#    print >> sys.stderr, qcmd
+#    os.system(qcmd)
+    i += 1
+
+

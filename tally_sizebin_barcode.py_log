@@ -1,0 +1,25 @@
+# IPython log file
+
+from Bio import SeqIO
+from collections import defaultdict
+from bisect import bisect_left
+
+
+bins = [0,2,3,5,10] # 0-2k, 2-3k, 3-5k, 5-10k
+counts = defaultdict(lambda: 0)
+reader = SeqIO.parse(open('isoseq_flnc.fasta'),'fasta')
+counts = defaultdict(lambda: defaultdict(lambda: 0)) # primer --> bin --> count
+for r in reader:
+    i = int(r.description.split(';')[-2].split('=')[1])
+    b = bisect_left(bins, len(r.seq)/1000.)
+    counts[b][i] += 1
+    
+f = open('barcode_recovery.txt', 'w')
+f.write("size\tbarcode\tnum_fl\tfl_percentage\n")
+for i in xrange(len(bins)-1):
+    size = "{0}to{1}k".format(bins[i], bins[i+1])
+    for p in xrange(6):
+        _sum = sum(counts[i+1].itervalues())
+        f.write("{0}\t{1}\t{2}\t{3:.0f}\n".format(size, p+1, counts[i+1][p], counts[i+1][p]*100./_sum))
+        
+f.close()

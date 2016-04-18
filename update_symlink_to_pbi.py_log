@@ -1,0 +1,21 @@
+# IPython log file
+
+import os
+import glob
+        
+def get_newlink(p):
+    assert p.startswith('/mnt/data3/vol')
+    raw = p.split('/')
+    q = "/pbi/collections/{0}/{1}/{2}".format(raw[4][:3], raw[4], raw[5])
+    # check files are the same, just use the xml files
+    for file in glob.glob(os.path.join(p, '*.xml')):
+        assert os.path.exists(os.path.join(q, file))
+    return q
+
+for x in os.listdir('.'):
+    if not os.path.isdir(x): continue
+    p = os.readlink(x)
+    if not p.startswith('/mnt/data3/'): continue
+    q = get_newlink(p)
+    print("ln -s -n -f {0} {1}".format(q, x))
+    

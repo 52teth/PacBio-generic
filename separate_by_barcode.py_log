@@ -1,0 +1,14 @@
+# IPython log file
+
+NUMBER_OF_BARCODES = 7
+
+
+from Bio import SeqIO
+reader = SeqIO.parse(open('isoseq_flnc.fasta'),'fasta')
+handles = {}
+for i in xrange(NUMBER_OF_BARCODES): handles[i] = open("isoseq_flnc.barcode_{0}.fasta".format(i), 'w')
+for r in reader:
+    i = int(r.description.split(';')[-2].split('=')[1])
+    handles[i].write(">{0}\n{1}\n".format(r.description, r.seq))
+    
+for v in handles.itervalues(): v.close()
