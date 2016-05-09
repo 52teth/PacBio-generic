@@ -14,7 +14,7 @@ def check_file_or_run(filename):
 @check_file_or_run('isoseq_flnc.fasta.blasr.sam')
 def run_BLASR(bash_f, args):
     if args.ref != 'NA':
-        bash_f.write("pbalign.py --maxHits 10 --hitPolicy all --algorithmOptions \"-nproc {cpus} -bestn 10 -nCandidates 10\" isoseq_flnc.fasta {ref} isoseq_flnc.fasta.blasr.sam\n".format(cpus=args.cpus, ref=args.ref))    
+        bash_f.write("pbalign --maxHits 10 --hitPolicy all --nproc {cpus} --algorithmOptions \"-bestn 10 -nCandidates 10\" isoseq_flnc.fasta {ref} isoseq_flnc.fasta.blasr.sam\n".format(cpus=args.cpus, ref=args.ref))    
 
 @check_file_or_run('isoseq_flnc.fasta.gff.log')
 def run_gmap(bash_f, args):

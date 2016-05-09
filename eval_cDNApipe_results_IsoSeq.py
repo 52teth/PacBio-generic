@@ -58,17 +58,6 @@ def summarize_gmap(roi_prefix='isoseq_flnc.fasta'):
 
     eval_accuracy_by_gmap.split_gmap_outcome(roi_prefix, roi_prefix+'.sam')
 
-def parse_blasr(sam_filename, ref_fasta_filename):
-    """
-    Return dict of ZMW --> best r by maximizing sCov
-    """
-    hit = {}
-    for r in BioReaders.BLASRSAMReader(sam_filename, True, ref_fasta_filename):
-        zmw = r.qID[:r.qID.find('/', r.qID.find('/')+1)]
-        if zmw not in hit or r.sCoverage >= hit[zmw].sCoverage:
-            hit[zmw] = r
-    return hit
-
 def tally_ref_hits(hit_by_zmw, ref_tally, min_sCov, min_qCov):
     for r in hit_by_zmw.itervalues():
         if r.sCoverage >= min_sCov and r.qCoverage >= min_qCov:
@@ -81,7 +70,8 @@ def summarize_blasr(roi_prefix='isoseq_flnc.fasta', ref_fasta_filename='/home/UN
     3. Abundance distribution of well-aligned refs
     """
     ref_len_dict = dict((r.id,len(r.seq)) for r in SeqIO.parse(open(ref_fasta_filename),'fasta'))
-    hit_roi = eval_refmap_by_blasr.parse_blasr(roi_prefix+'.blasr.sam', ref_len_dict)
+    query_len_dict = dict((r.id, len(r.seq)) for r in SeqIO.parse(open(roi_prefix),'fasta'))
+    hit_roi = eval_refmap_by_blasr.parse_blasr(roi_prefix+'.blasr.sam', ref_len_dict, query_len_dict)
 
     tally0 = defaultdict(lambda: 0)
     tally90 = defaultdict(lambda: 0)
@@ -115,7 +105,7 @@ def summarize_blasr(roi_prefix='isoseq_flnc.fasta', ref_fasta_filename='/home/UN
     if ref_size is None:
         eval_refmap_by_blasr.draw_coverage(hit, png_name_prefix+'.roi.ref_coverage', filter_func=lambda x: x.qCoverage>=.9, title="5'-3' reference coverage (qCov>=90%)")
     else:
-        a, b = ref_size
+        a, b = eval(ref_size)
         eval_refmap_by_blasr.draw_coverage(hit, png_name_prefix+'.roi.ref_coverage', filter_func=lambda x: x.qCoverage>=.9 and a<=x.sLen<=b, title="5'-3' reference coverage (qCov>=90%), ref length {0}-{1} bp".format(a,b))
 
 

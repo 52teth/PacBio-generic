@@ -2,15 +2,18 @@ import os, sys
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
+from Bio import SeqIO
 import BioReaders
 
-def parse_blasr(sam_filename, ref_fasta_filename):
+def parse_blasr(sam_filename, ref_len_dict, query_len_dict):
     """
     Return dict of ZMW --> best r by maximizing sCov
     """
     hit = {}
-    for r in BioReaders.BLASRSAMReader(sam_filename, True, ref_fasta_filename):
-        zmw = r.qID[:r.qID.find('/', r.qID.find('/')+1)]
+    reader = BioReaders.SAMReader(sam_filename, True, ref_len_dict=ref_len_dict, query_len_dict=query_len_dict)
+    for r in reader:
+        # ex: r.qID m160413_093833_sherri_c100981210310000001823218707061604_s1_p0/139330/9701_57_CCS
+        zmw = r.qID[:r.qID.rfind('/')]
         if zmw not in hit or r.sCoverage >= hit[zmw].sCoverage:
             hit[zmw] = r
     return hit
