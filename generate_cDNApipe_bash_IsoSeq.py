@@ -14,12 +14,12 @@ def check_file_or_run(filename):
 @check_file_or_run('isoseq_flnc.fasta.blasr.sam')
 def run_BLASR(bash_f, args):
     if args.ref != 'NA':
-        bash_f.write("pbalign --maxHits 10 --hitPolicy all --nproc {cpus} --algorithmOptions \"-bestn 10 -nCandidates 10\" isoseq_flnc.fasta {ref} isoseq_flnc.fasta.blasr.sam\n".format(cpus=args.cpus, ref=args.ref))    
+        bash_f.write("pbalign --maxHits 10 --hitPolicy all --nproc {cpus} --algorithmOptions \"-bestn 10 -nCandidates 20\" isoseq_flnc.fasta {ref} isoseq_flnc.fasta.blasr.sam\n".format(cpus=args.cpus, ref=args.ref))    
 
 @check_file_or_run('isoseq_flnc.fasta.gff.log')
 def run_gmap(bash_f, args):
     if args.gmap_db != 'NA':
-        bash_f.write("~/bin/gmap -D {gmap_db_dir} -d {gmap_db} -t {cpus} -f samse -n 0 isoseq_flnc.fasta > isoseq_flnc.fasta.sam 2> isoseq_flnc.fasta.sam.log\n".format(cpus=args.cpus, gmap_db=args.gmap_db, gmap_db_dir=args.gmap_db_dir))
+        bash_f.write("~/bin/gmap -D {gmap_db_dir} -d {gmap_db} -t {cpus} -f samse -z sense_force -n 0 isoseq_flnc.fasta > isoseq_flnc.fasta.sam 2> isoseq_flnc.fasta.sam.log\n".format(cpus=args.cpus, gmap_db=args.gmap_db, gmap_db_dir=args.gmap_db_dir))
         bash_f.write("sort -k 3,3 -k 4,4n isoseq_flnc.fasta.sam > isoseq_flnc.fasta.sorted.sam\n")
         bash_f.write("collapse_isoforms_by_sam.py --input isoseq_flnc.fasta -s isoseq_flnc.fasta.sorted.sam -c 0.99 -i 0.95 -o isoseq_flnc.5merge_c99i95\n")
     

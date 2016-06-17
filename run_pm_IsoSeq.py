@@ -9,13 +9,17 @@ gmap_db_dir = '/home/UNIXHOME/etseng/share/gmap_db_new'
 
 # option for GMAP and BLASR
 if species == 'hg19':
-    transcript_ref_dir = '/mnt/secondary/Share/Smrtanalysis-alpha/opt/smrtanalysis/common/references/Gencode15/'
-    transcript_ref_fasta = '/mnt/secondary/Share/Smrtanalysis-alpha/opt/smrtanalysis/common/references/Gencode15/sequence/Gencode15.fasta'
+    transcript_ref_dir = '/home/UNIXHOME/etseng/share/gencode/'
+    transcript_ref_fasta = '/home/UNIXHOME/etseng/share/gencode/gencode.v23.pc_transcripts.derep.fa'
     gmap_db_name = 'hg19'
 elif species == 'hg19_gmaponly':
     transcript_ref_dir = 'NA'
     transcript_ref_fasta = 'NA'
     gmap_db_name = 'hg19'
+elif species == 'chimp':
+    transcript_ref_dir = '/home/UNIXHOME/etseng/share/gencode/'
+    transcript_ref_fasta = '/home/UNIXHOME/etseng/share/gencode/gencode.v23.pc_transcripts.derep.fa'    
+    gmap_db_name = 'panTro4'
 elif species == 'rn5':
     transcript_ref_dir = '/mnt/secondary/Share/Smrtanalysis-alpha/opt/smrtanalysis/common/references/rat_UCSC'
     transcript_ref_fasta = '/mnt/secondary/Share/Smrtanalysis-alpha/opt/smrtanalysis/common/references/rat_UCSC/sequence/rat_UCSC.fasta'
@@ -36,7 +40,7 @@ else:
     print >> sys.stderr, "species not specified or unknown! quit!"
     sys.exit(-1)
 
-cmd_cDNA = "generate_cDNApipe_bash_IsoSeq.py --ref {0} --gmap_db {1} --gmap_db_dir {2} --cpus {3} --cmd_filename cDNApipe.sh".format(transcript_ref_dir, gmap_db_name, gmap_db_dir, NUM_CPUS)
+cmd_cDNA = "generate_cDNApipe_bash_IsoSeq.py --ref {0} --gmap_db {1} --gmap_db_dir {2} --cpus {3} --cmd_filename cDNApipe.sh".format(transcript_ref_fasta, gmap_db_name, gmap_db_dir, NUM_CPUS)
 if species == 'skip':
     cmd_eval = "eval_cDNApipe_results_IsoSeq.py --skip-GMAP --skip-BLASR > evaled_summary.txt"
 else:
